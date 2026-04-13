@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
 import { LoginForm } from "./LoginForm";
 
 export default async function LoginPage({
@@ -9,16 +8,6 @@ export default async function LoginPage({
 }) {
   const sp = await searchParams;
   const nextPath = sp.next && sp.next.startsWith("/") ? sp.next : "/";
-
-  const supabase = await createClient();
-  const { data: signupRow } = await supabase
-    .from("global_settings")
-    .select("value")
-    .eq("key", "signup_enabled")
-    .maybeSingle();
-  const v = signupRow?.value;
-  const signupEnabled =
-    signupRow == null ? true : v === true || v === "true";
 
   return (
     <main className="mx-auto flex max-w-md flex-col gap-6 p-8">
@@ -31,7 +20,7 @@ export default async function LoginPage({
           when sign-up is enabled.
         </p>
       </div>
-      <LoginForm nextPath={nextPath} signupEnabled={signupEnabled} />
+      <LoginForm nextPath={nextPath} />
       <p className="text-sm text-muted">
         <Link href="/" className="transition hover:text-foreground">
           ← Back home

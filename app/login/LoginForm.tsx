@@ -1,18 +1,38 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
 type Mode = "signin" | "signup";
 
-export function LoginForm({
-  nextPath,
-  signupEnabled,
-}: {
-  nextPath: string;
-  signupEnabled: boolean;
-}) {
+function formatAuthError(message: string | undefined): string {
+  const m = message?.trim() ?? "";
+  if (
+    m === "" ||
+    m === "Load failed" ||
+    m === "Failed to fetch" ||
+    m === "NetworkError when attempting to fetch resource."
+  ) {
+    return (
+      "Could not reach Supabase (network error). On production, confirm Vercel has " +
+      "NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY, redeploy, and " +
+      "check the Supabase project is not paused. Try another network or disable VPN/ad blockers."
+    );
+  }
+  return m;
+}
+
+function hasPublicSupabaseEnv(): boolean {
+  return (
+    typeof process.env.NEXT_PUBLIC_SUPABASE_URL === "string" &&
+    process.env.NEXT_PUBLIC_SUPABASE_URL.length > 0 &&
+    typeof process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY === "string" &&
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY.length > 0
+  );
+}
+
+export function LoginForm({ nextPath }: { nextPath: string }) {
   const router = useRouter();
   const [mode, setMode] = useState<Mode>("signin");
   const [email, setEmail] = useState("");
@@ -22,11 +42,41 @@ export function LoginForm({
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [signupEnabled, setSignupEnabled] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const supabase = createClient();
+        const { data } = await supabase
+          .from("global_settings")
+          .select("value")
+          .eq("key", "signup_enabled")
+          .maybeSingle();
+        if (cancelled) return;
+        const v = data?.value;
+        setSignupEnabled(data == null ? true : v === true || v === "true");
+      } catch {
+        if (!cancelled) setSignupEnabled(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setInfo(null);
+
+    if (!hasPublicSupabaseEnv()) {
+      setError(
+        "Supabase URL or anon key is missing in this build. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in Vercel (or .env locally), then redeploy."
+      );
+      return;
+    }
 
     if (mode === "signup") {
       if (!signupEnabled) {
@@ -53,7 +103,7 @@ export function LoginForm({
       });
       setPending(false);
       if (signError) {
-        setError(signError.message);
+        setError(formatAuthError(signError.message));
         return;
       }
       router.push(nextPath.startsWith("/") ? nextPath : "/");
@@ -76,7 +126,7 @@ export function LoginForm({
     setPending(false);
 
     if (signError) {
-      setError(signError.message);
+      setError(formatAuthError(signError.message));
       return;
     }
 
@@ -95,6 +145,13 @@ export function LoginForm({
 
   return (
     <div className="flex flex-col gap-4">
+      {!hasPublicSupabaseEnv() ? (
+        <p className="rounded-md border border-red-900/60 bg-red-950/40 px-3 py-2 text-sm text-red-200">
+          Configuration error: public Supabase environment variables are missing.
+          Add them in Vercel → Settings → Environment Variables, then redeploy.
+        </p>
+      ) : null}
+
       {signupEnabled ? (
         <div className="flex gap-2 rounded-lg border border-border bg-card/40 p-1">
           <button

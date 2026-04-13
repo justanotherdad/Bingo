@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { presetLabel, type BallPreset } from "@/lib/bingo";
 import { HostStartForm } from "@/components/host/HostStartForm";
@@ -11,7 +12,9 @@ export default async function HostPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) return null;
+  if (!user) {
+    redirect("/login?next=/host");
+  }
 
   const { data: game } = await supabase
     .from("games")

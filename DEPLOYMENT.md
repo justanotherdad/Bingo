@@ -105,3 +105,12 @@ If your domain’s email stays on Hostinger, that does not conflict with the app
 | Display 403 | Wrong `t` token or game id; use the exact link from `/host`. |
 | No sound on TV | Browsers require a user gesture — use **Tap to enable sound** on the display page. |
 | Relative display links on `/host` | Set `NEXT_PUBLIC_APP_URL` to your public `https://` origin. |
+
+
+## 8. Deployments
+
+```bash
+cd "/Users/davefletes/Library/Mobile Documents/com~apple~CloudDocs/Buisness/DJ2/Applications/Bingo"
+git add .
+git commit -m "update"
+git push -u origin main
