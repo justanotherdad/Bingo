@@ -1,0 +1,79 @@
+import { createClient } from "@/lib/supabase/server";
+import { presetLabel, type BallPreset } from "@/lib/bingo";
+import { HostControlPanel } from "@/components/host/HostControlPanel";
+import Link from "next/link";
+
+export const dynamic = "force-dynamic";
+
+export default async function HostControlPage() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data: game } = await supabase
+    .from("games")
+    .select("id, ball_preset, display_token")
+    .eq("user_id", user.id)
+    .eq("status", "active")
+    .maybeSingle();
+
+  const origin =
+    process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ||
+    (typeof process.env.VERCEL_URL === "string"
+      ? `https://${process.env.VERCEL_URL}`
+      : "");
+
+  const displayUrl =
+    game && origin
+      ? `${origin}/display/${game.id}?t=${game.display_token}`
+      : game
+        ? `/display/${game.id}?t=${game.display_token}`
+        : null;
+
+  if (!game) {
+    return (
+      <div className="mx-auto max-w-md space-y-4">
+        <h1 className="text-xl font-semibold text-foreground">Controller</h1>
+        <p className="text-sm text-muted">No active game. Start one from Host.</p>
+        <Link
+          href="/host"
+          className="inline-flex rounded-md bg-accent px-4 py-2 text-sm font-medium text-accent-foreground"
+        >
+          Back to Host
+        </Link>
+      </div>
+    );
+  }
+
+  const preset = game.ball_preset as BallPreset;
+
+  return (
+    <div className="mx-auto max-w-lg space-y-6">
+      <div>
+        <h1 className="text-xl font-semibold text-foreground">Controller</h1>
+        <p className="mt-1 text-sm text-muted">
+          {presetLabel(preset)} · Draw numbers for the room; the TV page shows
+          animations and sound.
+        </p>
+      </div>
+
+      {displayUrl ? (
+        <p className="text-xs text-muted">
+          Display:{" "}
+          <a
+            href={displayUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="break-all font-mono text-accent underline-offset-2 hover:underline"
+          >
+            {displayUrl}
+          </a>
+        </p>
+      ) : null}
+
+      <HostControlPanel initialPreset={preset} />
+    </div>
+  );
+}
