@@ -32,9 +32,15 @@ function hasPublicSupabaseEnv(): boolean {
   );
 }
 
-export function LoginForm({ nextPath }: { nextPath: string }) {
+export function LoginForm({
+  nextPath,
+  initialMode = "signin",
+}: {
+  nextPath: string;
+  initialMode?: Mode;
+}) {
   const router = useRouter();
-  const [mode, setMode] = useState<Mode>("signin");
+  const [mode, setMode] = useState<Mode>(initialMode);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -65,6 +71,10 @@ export function LoginForm({ nextPath }: { nextPath: string }) {
       cancelled = true;
     };
   }, []);
+
+  function getSuccessPath() {
+    return nextPath.startsWith("/") && nextPath !== "/" ? nextPath : "/host";
+  }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -106,7 +116,7 @@ export function LoginForm({ nextPath }: { nextPath: string }) {
         setError(formatAuthError(signError.message));
         return;
       }
-      router.push(nextPath.startsWith("/") ? nextPath : "/");
+      router.push(getSuccessPath());
       router.refresh();
       return;
     }
@@ -131,7 +141,7 @@ export function LoginForm({ nextPath }: { nextPath: string }) {
     }
 
     if (data.session) {
-      router.push(nextPath.startsWith("/") ? nextPath : "/");
+      router.push(getSuccessPath());
       router.refresh();
       return;
     }

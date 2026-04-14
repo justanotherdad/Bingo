@@ -1,13 +1,25 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
 import { LoginForm } from "./LoginForm";
 
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ next?: string }>;
+  searchParams: Promise<{ next?: string; mode?: string }>;
 }) {
   const sp = await searchParams;
-  const nextPath = sp.next && sp.next.startsWith("/") ? sp.next : "/";
+  const nextPath = sp.next && sp.next.startsWith("/") ? sp.next : "/host";
+  const initialMode = sp.mode === "signup" ? "signup" : "signin";
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (user) {
+    redirect(nextPath);
+  }
 
   return (
     <main className="mx-auto flex max-w-md flex-col gap-6 p-8">
@@ -20,7 +32,7 @@ export default async function LoginPage({
           when sign-up is enabled.
         </p>
       </div>
-      <LoginForm nextPath={nextPath} />
+      <LoginForm nextPath={nextPath} initialMode={initialMode} />
       <p className="text-sm text-muted">
         <Link href="/" className="transition hover:text-foreground">
           ← Back home
