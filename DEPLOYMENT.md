@@ -112,5 +112,5 @@ If your domain’s email stays on Hostinger, that does not conflict with the app
 ```bash
 cd "/Users/davefletes/Library/Mobile Documents/com~apple~CloudDocs/Buisness/DJ2/Applications/Bingo"
 git add .
-git commit -m "update"
+git commit -m "Initial commit"
 git push -u origin main
