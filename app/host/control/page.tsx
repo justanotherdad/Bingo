@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { presetLabel, type BallPreset } from "@/lib/bingo";
 import { HostControlPanel } from "@/components/host/HostControlPanel";
 import Link from "next/link";
+import { headers } from "next/headers";
 
 export const dynamic = "force-dynamic";
 
@@ -19,11 +20,10 @@ export default async function HostControlPage() {
     .eq("status", "active")
     .maybeSingle();
 
-  const origin =
-    process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ||
-    (typeof process.env.VERCEL_URL === "string"
-      ? `https://${process.env.VERCEL_URL}`
-      : "");
+  const h = await headers();
+  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "";
+  const proto = h.get("x-forwarded-proto") ?? "https";
+  const origin = host ? `${proto}://${host}` : "";
 
   const displayUrl =
     game && origin

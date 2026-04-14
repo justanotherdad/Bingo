@@ -150,3 +150,29 @@ export async function clearBoardAndNewGame(preset: BallPreset) {
   revalidatePath("/host/control");
   return newGame;
 }
+
+export async function endHostSession() {
+  const { supabase, user } = await requireUser();
+  const endedAt = new Date().toISOString();
+
+  const { error: gameErr } = await supabase
+    .from("games")
+    .update({ status: "cancelled", ended_at: endedAt })
+    .eq("user_id", user.id)
+    .eq("status", "active");
+
+  if (gameErr) throw new Error(gameErr.message);
+
+  const { error: sessionErr } = await supabase
+    .from("host_sessions")
+    .update({ ended_at: endedAt })
+    .eq("user_id", user.id)
+    .is("ended_at", null);
+
+  if (sessionErr) throw new Error(sessionErr.message);
+
+  revalidatePath("/host");
+  revalidatePath("/host/control");
+  revalidatePath("/display");
+  return { ok: true };
+}

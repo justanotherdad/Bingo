@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { presetLabel, type BallPreset } from "@/lib/bingo";
 import { HostStartForm } from "@/components/host/HostStartForm";
+import { DisplayConnectPanel } from "@/components/host/DisplayConnectPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -23,11 +25,10 @@ export default async function HostPage() {
     .eq("status", "active")
     .maybeSingle();
 
-  const origin =
-    process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ||
-    (typeof process.env.VERCEL_URL === "string"
-      ? `https://${process.env.VERCEL_URL}`
-      : "");
+  const h = await headers();
+  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "";
+  const proto = h.get("x-forwarded-proto") ?? "https";
+  const origin = host ? `${proto}://${host}` : "";
 
   const displayUrl =
     game && origin
@@ -66,27 +67,8 @@ export default async function HostPage() {
             >
               Open controller
             </Link>
-            {displayUrl ? (
-              <a
-                className="inline-flex justify-center rounded-md border border-border bg-card/40 px-4 py-2 text-sm text-foreground transition hover:border-muted"
-                href={displayUrl}
-                target="_blank"
-                rel="noreferrer"
-              >
-                Open display (TV)
-              </a>
-            ) : null}
           </div>
-          {displayUrl ? (
-            <label className="block text-xs text-muted">
-              Display link (copy to TV browser)
-              <input
-                readOnly
-                className="mt-1 w-full rounded border border-border bg-card px-2 py-1 font-mono text-[11px] text-foreground"
-                value={displayUrl}
-              />
-            </label>
-          ) : null}
+          {displayUrl ? <DisplayConnectPanel gameId={game.id} displayUrl={displayUrl} /> : null}
         </section>
       ) : (
         <HostStartForm />

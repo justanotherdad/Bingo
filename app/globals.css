@@ -88,4 +88,18 @@
       animation: none !important;
     }
   }
+
+  @keyframes latest-blink {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.35;
+    }
+  }
+
+  .blink-latest {
+    animation: latest-blink 1s ease-in-out infinite;
+  }
 }

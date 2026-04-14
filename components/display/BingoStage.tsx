@@ -18,6 +18,14 @@ export function BingoStage({
   animNonce: number;
 }) {
   const letter = latest ? letterForNumber(preset, latest.number) : null;
+  const byLetter: Record<string, number[]> = { B: [], I: [], N: [], G: [], O: [] };
+  if (preset === "US-75") {
+    for (const d of draws) {
+      const l = letterForNumber(preset, d.number);
+      if (l && l in byLetter) byLetter[l].push(d.number);
+    }
+    Object.keys(byLetter).forEach((k) => byLetter[k].sort((a, b) => a - b));
+  }
 
   return (
     <div className="flex min-h-screen flex-col bg-[radial-gradient(ellipse_at_50%_0%,hsl(263_40%_14%/0.5),transparent_55%),linear-gradient(to_bottom,hsl(var(--background)),hsl(240_6%_6%))]">
@@ -59,24 +67,51 @@ export function BingoStage({
         <p className="mb-2 text-center text-xs font-medium uppercase tracking-wide text-muted">
           Numbers called ({draws.length})
         </p>
-        <div className="mx-auto flex max-h-32 max-w-6xl flex-wrap justify-center gap-2 overflow-y-auto">
-          {[...draws].reverse().map((d) => {
-            const col = letterForNumber(preset, d.number);
-            return (
+        {preset === "US-75" ? (
+          <div className="mx-auto grid max-w-6xl gap-2">
+            {(["B", "I", "N", "G", "O"] as const).map((col) => (
+              <div
+                key={col}
+                className="flex flex-wrap items-center gap-2 rounded-lg border border-border/70 bg-background/40 px-3 py-2"
+              >
+                <span className="inline-flex h-7 w-7 items-center justify-center rounded bg-accent/25 text-sm font-black text-accent">
+                  {col}
+                </span>
+                {byLetter[col].length ? (
+                  byLetter[col].map((n) => (
+                    <span
+                      key={`${col}-${n}`}
+                      className={`inline-flex min-w-[2.5rem] items-center justify-center rounded-md border px-2 py-1 text-sm tabular-nums ${
+                        latest?.number === n
+                          ? "blink-latest border-accent bg-accent/20 text-accent-foreground"
+                          : "border-border/80 bg-background/60 text-foreground/95"
+                      }`}
+                    >
+                      {n}
+                    </span>
+                  ))
+                ) : (
+                  <span className="text-xs text-muted">No calls yet</span>
+                )}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="mx-auto flex max-h-32 max-w-6xl flex-wrap justify-center gap-2 overflow-y-auto">
+            {[...draws].reverse().map((d) => (
               <span
                 key={d.id}
-                className="inline-flex min-w-[3.25rem] items-center justify-center rounded-lg border border-border/80 bg-background/60 px-2 py-1 text-sm tabular-nums text-foreground/95"
+                className={`inline-flex min-w-[3.25rem] items-center justify-center rounded-lg border px-2 py-1 text-sm tabular-nums ${
+                  latest?.id === d.id
+                    ? "blink-latest border-accent bg-accent/20 text-accent-foreground"
+                    : "border-border/80 bg-background/60 text-foreground/95"
+                }`}
               >
-                {col ? (
-                  <span className="mr-1 text-[10px] font-bold text-accent">
-                    {col}
-                  </span>
-                ) : null}
                 {d.number}
               </span>
-            );
-          })}
-        </div>
+            ))}
+          </div>
+        )}
       </footer>
     </div>
   );

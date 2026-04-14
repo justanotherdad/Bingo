@@ -1,10 +1,11 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import {
   clearBoardAndNewGame,
   drawNextNumber,
+  endHostSession,
 } from "@/app/host/actions";
 import { playDrawChime, resumeAudioContext } from "@/lib/audio/drawChime";
 import type { BallPreset } from "@/lib/bingo";
@@ -18,7 +19,49 @@ export function HostControlPanel({
   const [preset, setPreset] = useState<BallPreset>(initialPreset);
   const [error, setError] = useState<string | null>(null);
   const [lastDraw, setLastDraw] = useState<string | null>(null);
+  const [ending, setEnding] = useState(false);
+  const [wakeOn, setWakeOn] = useState(false);
   const [pending, startTransition] = useTransition();
+  const wakeRef = useRef<WakeLockSentinel | null>(null);
+
+  async function requestWakeLock() {
+    try {
+      if (!("wakeLock" in navigator)) {
+        setError("Wake lock is not supported on this browser.");
+        return;
+      }
+      wakeRef.current = await navigator.wakeLock.request("screen");
+      setWakeOn(true);
+      wakeRef.current.addEventListener("release", () => {
+        setWakeOn(false);
+      });
+    } catch {
+      setError("Could not enable keep-awake mode.");
+    }
+  }
+
+  async function releaseWakeLock() {
+    try {
+      await wakeRef.current?.release();
+    } catch {
+      /* ignore */
+    }
+    wakeRef.current = null;
+    setWakeOn(false);
+  }
+
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible" && wakeOn) {
+        void requestWakeLock();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      void releaseWakeLock();
+    };
+  }, [wakeOn]);
 
   function onDraw() {
     setError(null);
@@ -52,12 +95,31 @@ export function HostControlPanel({
     });
   }
 
+  async function onEndSession() {
+    const ok = window.confirm(
+      "End this session now? This closes the active game and returns you to Host."
+    );
+    if (!ok) return;
+    setError(null);
+    setEnding(true);
+    try {
+      await endHostSession();
+      await releaseWakeLock();
+      router.push("/host");
+      router.refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not end session");
+    } finally {
+      setEnding(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="grid gap-3 sm:grid-cols-2">
         <button
           type="button"
-          disabled={pending}
+          disabled={pending || ending}
           onClick={onDraw}
           className="rounded-xl border border-border bg-card py-6 text-lg font-semibold text-foreground shadow-lg shadow-black/30 transition hover:border-accent/50 disabled:opacity-50"
         >
@@ -65,11 +127,37 @@ export function HostControlPanel({
         </button>
         <button
           type="button"
-          disabled={pending}
+          disabled={pending || ending}
           onClick={onClear}
           className="rounded-xl border border-red-900/60 bg-red-950/30 py-6 text-lg font-semibold text-red-100 transition hover:bg-red-950/50 disabled:opacity-50"
         >
           Clear board
+        </button>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <button
+          type="button"
+          disabled={pending || ending}
+          onClick={() => {
+            setError(null);
+            if (wakeOn) {
+              void releaseWakeLock();
+            } else {
+              void requestWakeLock();
+            }
+          }}
+          className="rounded-xl border border-border bg-card/50 py-4 text-sm font-semibold text-foreground transition hover:border-accent/40 disabled:opacity-50"
+        >
+          {wakeOn ? "Keep awake: on (tap to disable)" : "Keep screen awake"}
+        </button>
+        <button
+          type="button"
+          disabled={pending || ending}
+          onClick={onEndSession}
+          className="rounded-xl border border-red-900/60 bg-red-950/30 py-4 text-sm font-semibold text-red-100 transition hover:bg-red-950/50 disabled:opacity-50"
+        >
+          {ending ? "Ending…" : "End session"}
         </button>
       </div>
 
