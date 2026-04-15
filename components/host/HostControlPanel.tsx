@@ -29,13 +29,15 @@ const LETTER_COLOR: Record<string, string> = {
 // ─── Component ────────────────────────────────────────────────────────────────
 export function HostControlPanel({
   initialPreset,
+  initialLastDraw = null,
 }: {
   initialPreset: BallPreset;
+  initialLastDraw?: LastDraw;
 }) {
   const router = useRouter();
   const [preset, setPreset]       = useState<BallPreset>(initialPreset);
   const [error, setError]         = useState<string | null>(null);
-  const [lastDraw, setLastDraw]   = useState<LastDraw>(null);
+  const [lastDraw, setLastDraw]   = useState<LastDraw>(initialLastDraw);
   const [ending, setEnding]       = useState(false);
   const [wakeOn, setWakeOn]       = useState(false);
   const [pending, startTransition] = useTransition();
@@ -50,35 +52,61 @@ export function HostControlPanel({
 
   useEffect(() => { autoSpeedRef.current = autoSpeed; }, [autoSpeed]);
 
-  // ── Wake lock ──────────────────────────────────────────────────────────────
+  // ── Wake lock (must not release in an effect that re-runs when wakeOn toggles) ─
   const wakeRef = useRef<WakeLockSentinel | null>(null);
+  const wakeOnRef = useRef(false);
+  const [wakeMsg, setWakeMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    wakeOnRef.current = wakeOn;
+  }, [wakeOn]);
 
   async function requestWakeLock() {
     try {
-      if (!("wakeLock" in navigator)) return;
+      if (typeof navigator === "undefined" || !("wakeLock" in navigator)) {
+        setWakeMsg("Screen wake lock is not supported in this browser (try Safari/Chrome).");
+        return;
+      }
       wakeRef.current = await navigator.wakeLock.request("screen");
       setWakeOn(true);
+      setWakeMsg(null);
       wakeRef.current.addEventListener("release", () => setWakeOn(false));
-    } catch { /* ignore */ }
+    } catch (e) {
+      setWakeMsg(e instanceof Error ? e.message : "Could not enable keep-awake.");
+    }
   }
 
   async function releaseWakeLock() {
-    try { await wakeRef.current?.release(); } catch { /* ignore */ }
+    try {
+      await wakeRef.current?.release();
+    } catch {
+      /* ignore */
+    }
     wakeRef.current = null;
     setWakeOn(false);
   }
 
   useEffect(() => {
-    const onVisible = () => {
-      if (document.visibilityState === "visible" && wakeOn) void requestWakeLock();
-    };
+    async function onVisible() {
+      if (document.visibilityState !== "visible" || !wakeOnRef.current) return;
+      try {
+        if (typeof navigator === "undefined" || !("wakeLock" in navigator)) return;
+        wakeRef.current = await navigator.wakeLock.request("screen");
+        wakeRef.current.addEventListener("release", () => setWakeOn(false));
+      } catch {
+        /* tab may deny re-lock */
+      }
+    }
     document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, []);
+
+  useEffect(() => {
     return () => {
-      document.removeEventListener("visibilitychange", onVisible);
-      void releaseWakeLock();
+      void wakeRef.current?.release().catch(() => {});
+      wakeRef.current = null;
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [wakeOn]);
+  }, []);
 
   // ── Core draw ──────────────────────────────────────────────────────────────
   function executeDraw(calledFromAuto = false) {
@@ -315,7 +343,11 @@ export function HostControlPanel({
         <button
           type="button"
           disabled={busy}
-          onClick={() => { setError(null); wakeOn ? void releaseWakeLock() : void requestWakeLock(); }}
+          onClick={() => {
+            setError(null);
+            setWakeMsg(null);
+            wakeOn ? void releaseWakeLock() : void requestWakeLock();
+          }}
           className={`rounded-xl border py-3 text-xs font-semibold transition disabled:opacity-40 ${
             wakeOn
               ? "border-green-700/60 bg-green-950/30 text-green-200 hover:bg-green-950/50"
@@ -345,6 +377,10 @@ export function HostControlPanel({
           </div>
         </div>
       </div>
+
+      {wakeMsg ? (
+        <p className="text-center text-xs text-amber-200/90">{wakeMsg}</p>
+      ) : null}
 
       {/* ── Error ─────────────────────────────────────────────────────────── */}
       {error ? (

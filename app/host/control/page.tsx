@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { presetLabel, type BallPreset } from "@/lib/bingo";
+import { letterForNumber, presetLabel, type BallPreset } from "@/lib/bingo";
 import { HostControlPanel } from "@/components/host/HostControlPanel";
 import Link from "next/link";
 import { headers } from "next/headers";
@@ -49,6 +49,22 @@ export default async function HostControlPage() {
 
   const preset = game.ball_preset as BallPreset;
 
+  const { data: lastDrawRow } = await supabase
+    .from("draws")
+    .select("number, draw_order")
+    .eq("game_id", game.id)
+    .order("draw_order", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const initialLastDraw = lastDrawRow
+    ? {
+        number: lastDrawRow.number,
+        letter: letterForNumber(preset, lastDrawRow.number),
+        order: lastDrawRow.draw_order,
+      }
+    : null;
+
   return (
     <div className="mx-auto max-w-lg space-y-6">
       <div>
@@ -73,7 +89,11 @@ export default async function HostControlPage() {
         </p>
       ) : null}
 
-      <HostControlPanel initialPreset={preset} />
+      <HostControlPanel
+        key={game.id}
+        initialPreset={preset}
+        initialLastDraw={initialLastDraw}
+      />
     </div>
   );
 }

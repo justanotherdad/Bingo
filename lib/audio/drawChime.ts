@@ -1,6 +1,6 @@
 /**
- * Bingo audio — all sounds synthesized via Web Audio (no asset files needed).
- * Call resumeAudioContext() from a user gesture before playing any sound.
+ * Bingo draw sound: optional `NEXT_PUBLIC_DRAW_CHIME_URL` (MP3/WAV/OGG), else Web Audio synth.
+ * Call resumeAudioContext() from a user gesture before playing (mobile unlock).
  */
 
 let sharedCtx: AudioContext | null = null;
@@ -50,8 +50,28 @@ function tone(
 }
 
 // ─── Ball draw chime ──────────────────────────────────────────────────────────
-/** Pleasant three-note ascending xylophone chime — plays on every ball draw. */
+const CUSTOM_URL =
+  typeof process !== "undefined"
+    ? process.env.NEXT_PUBLIC_DRAW_CHIME_URL?.trim()
+    : undefined;
+
+/** If `NEXT_PUBLIC_DRAW_CHIME_URL` is set, plays that MP3/OGG/WAV (public HTTPS URL). */
 export function playDrawChime(): void {
+  if (CUSTOM_URL && typeof window !== "undefined") {
+    try {
+      const a = new Audio(CUSTOM_URL);
+      a.volume = 0.9;
+      void a.play().catch(() => playDrawChimeSynth());
+      return;
+    } catch {
+      playDrawChimeSynth();
+      return;
+    }
+  }
+  playDrawChimeSynth();
+}
+
+function playDrawChimeSynth(): void {
   const ctx = getAudioContext();
   if (!ctx) return;
 

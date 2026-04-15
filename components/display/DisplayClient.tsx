@@ -266,28 +266,36 @@ export function DisplayClient({
 
   return (
     <div className="relative min-h-screen overflow-hidden">
-      {/* Top-right controls */}
-      <div className="pointer-events-auto absolute right-3 top-3 z-20 flex items-center gap-2">
-        {/* Realtime dot */}
+      {/* Live status — top right (small) */}
+      <div className="pointer-events-none absolute right-3 top-3 z-20">
         <span
           title={
-            realtimeOk === true  ? "Live via Realtime" :
-            realtimeOk === false ? "Using polling fallback" :
-            "Connecting…"
+            realtimeOk === true
+              ? "Live via Realtime"
+              : realtimeOk === false
+                ? "Using polling fallback"
+                : "Connecting…"
           }
-          className="h-2 w-2 rounded-full"
+          className="inline-block h-2 w-2 rounded-full"
           style={{
             background:
-              realtimeOk === true  ? "#22c55e" :
-              realtimeOk === false ? "#f59e0b" : "#6b7280",
+              realtimeOk === true
+                ? "#22c55e"
+                : realtimeOk === false
+                  ? "#f59e0b"
+                  : "#6b7280",
             boxShadow: realtimeOk === true ? "0 0 6px #22c55e" : "none",
           }}
         />
+      </div>
+
+      {/* Sound — bottom left (TV-safe, easy to reach) */}
+      <div className="pointer-events-auto fixed bottom-4 left-4 z-20 flex flex-col gap-2 sm:bottom-6 sm:left-6">
         {!unlocked ? (
           <button
             type="button"
             onClick={() => void unlockFromGesture()}
-            className="rounded border border-white/20 bg-black/60 px-2.5 py-1 text-xs font-medium text-white/80 backdrop-blur transition hover:bg-black/80"
+            className="rounded-lg border border-white/20 bg-black/70 px-3 py-2 text-xs font-medium text-white/90 shadow-lg backdrop-blur transition hover:bg-black/85"
           >
             🔊 Enable sound
           </button>
@@ -295,7 +303,7 @@ export function DisplayClient({
           <button
             type="button"
             onClick={toggleSound}
-            className="rounded border border-white/20 bg-black/60 px-2.5 py-1 text-xs font-medium text-white/80 backdrop-blur transition hover:bg-black/80"
+            className="rounded-lg border border-white/20 bg-black/70 px-3 py-2 text-xs font-medium text-white/90 shadow-lg backdrop-blur transition hover:bg-black/85"
           >
             {soundOn ? "🔊" : "🔇"} Sound {soundOn ? "on" : "off"}
           </button>
