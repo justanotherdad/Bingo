@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>🎱 Bingo Display</title>
+<style>
+  /* ─── Reset & Base ─────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --B: #3B9EFF;
+    --I: #FF4D4D;
+    --N: #EEEEEE;
+    --G: #2ECC71;
+    --O: #FF9800;
+    --bg: #0a0a14;
+    --panel: rgba(255,255,255,0.06);
+    --border: rgba(255,255,255,0.12);
+    --text: #f0f0f0;
+    --muted: rgba(255,255,255,0.4);
+  }
+
+  html, body {
+    width: 100%; height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    overflow: hidden;
+    user-select: none;
+  }
+
+  /* ─── Layout ────────────────────────────────────── */
+  #root {
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    height: 100vh;
+    padding: 20px 28px 16px;
+    gap: 14px;
+  }
+
+  /* ─── Header ────────────────────────────────────── */
+  #header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+  }
+
+  #logo {
+    display: flex;
+    gap: 4px;
+    font-size: clamp(2.4rem, 5vw, 4.2rem);
+    font-weight: 900;
+    letter-spacing: 8px;
+    line-height: 1;
+  }
+
+  #logo span { text-shadow: 0 0 30px currentColor; }
+  #logo .B { color: var(--B); }
+  #logo .I { color: var(--I); }
+  #logo .N { color: var(--N); }
+  #logo .G { color: var(--G); }
+  #logo .O { color: var(--O); }
+
+  #status-bar {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+  }
+
+  #conn-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: #888;
+    transition: background 0.4s;
+    display: inline-block;
+    margin-right: 6px;
+    box-shadow: 0 0 0 3px rgba(255,255,255,0.1);
+  }
+  #conn-dot.connected { background: #2ECC71; box-shadow: 0 0 8px #2ECC71; }
+  #conn-dot.error     { background: #FF4D4D; box-shadow: 0 0 8px #FF4D4D; }
+
+  #conn-label { font-size: 0.75rem; color: var(--muted); }
+  #ball-count { font-size: 1rem; color: var(--muted); font-weight: 600; letter-spacing: 1px; }
+
+  /* ─── Middle ────────────────────────────────────── */
+  #middle {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 24px;
+    min-height: 0;
+  }
+
+  /* ─── Current Ball ──────────────────────────────── */
+  #current-ball-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    min-width: 220px;
+  }
+
+  #current-ball {
+    position: relative;
+    width: clamp(180px, 20vw, 260px);
+    height: clamp(180px, 20vw, 260px);
+    border-radius: 50%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: var(--panel);
+    border: 3px solid var(--border);
+    transition: border-color 0.3s, box-shadow 0.3s;
+    overflow: hidden;
+  }
+
+  #current-ball.has-ball {
+    animation: popIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  #ball-letter {
+    font-size: clamp(1.6rem, 3.5vw, 2.8rem);
+    font-weight: 900;
+    letter-spacing: 2px;
+    line-height: 1;
+    transition: color 0.3s;
+  }
+
+  #ball-number {
+    font-size: clamp(3rem, 8vw, 7rem);
+    font-weight: 900;
+    line-height: 1;
+    transition: color 0.3s;
+  }
+
+  #ball-label-full {
+    font-size: 0.7rem;
+    color: var(--muted);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-top: 4px;
+  }
+
+  /* glow ring matching ball color */
+  #current-ball.B { border-color: var(--B); box-shadow: 0 0 40px rgba(59,158,255,0.4), 0 0 80px rgba(59,158,255,0.15); }
+  #current-ball.I { border-color: var(--I); box-shadow: 0 0 40px rgba(255,77,77,0.4),  0 0 80px rgba(255,77,77,0.15); }
+  #current-ball.N { border-color: var(--N); box-shadow: 0 0 40px rgba(238,238,238,0.3),0 0 80px rgba(238,238,238,0.1); }
+  #current-ball.G { border-color: var(--G); box-shadow: 0 0 40px rgba(46,204,113,0.4), 0 0 80px rgba(46,204,113,0.15); }
+  #current-ball.O { border-color: var(--O); box-shadow: 0 0 40px rgba(255,152,0,0.4),  0 0 80px rgba(255,152,0,0.15); }
+
+  /* ─── Recent Balls ──────────────────────────────── */
+  #recent-balls {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-start;
+    justify-content: center;
+  }
+  #recent-label {
+    font-size: 0.65rem;
+    color: var(--muted);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+  #recent-list {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .recent-ball {
+    width: 52px; height: 52px;
+    border-radius: 50%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 0.65rem;
+    border: 2px solid;
+    opacity: 0.85;
+    transition: opacity 0.3s;
+    flex-shrink: 0;
+  }
+  .recent-ball .rb-letter { font-size: 0.55rem; letter-spacing: 1px; line-height: 1; }
+  .recent-ball .rb-num   { font-size: 1.1rem; line-height: 1; }
+  .recent-ball.B { color: var(--B); border-color: var(--B); background: rgba(59,158,255,0.12); }
+  .recent-ball.I { color: var(--I); border-color: var(--I); background: rgba(255,77,77,0.12); }
+  .recent-ball.N { color: var(--N); border-color: var(--N); background: rgba(238,238,238,0.08); }
+  .recent-ball.G { color: var(--G); border-color: var(--G); background: rgba(46,204,113,0.12); }
+  .recent-ball.O { color: var(--O); border-color: var(--O); background: rgba(255,152,0,0.12); }
+
+  .recent-ball:first-child { opacity: 1; transform: scale(1.1); }
+  .recent-ball:nth-child(2) { opacity: 0.7; }
+  .recent-ball:nth-child(3) { opacity: 0.5; }
+  .recent-ball:nth-child(4) { opacity: 0.35; }
+  .recent-ball:nth-child(5) { opacity: 0.2; }
+
+  /* ─── Board ─────────────────────────────────────── */
+  #board-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 0;
+    width: 100%;
+  }
+
+  #board {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 6px;
+    width: 100%;
+    max-width: 900px;
+  }
+
+  .col-header {
+    text-align: center;
+    font-size: clamp(1.4rem, 2.5vw, 2rem);
+    font-weight: 900;
+    padding-bottom: 6px;
+    letter-spacing: 2px;
+  }
+  .col-header.B { color: var(--B); text-shadow: 0 0 20px var(--B); }
+  .col-header.I { color: var(--I); text-shadow: 0 0 20px var(--I); }
+  .col-header.N { color: var(--N); text-shadow: 0 0 20px var(--N); }
+  .col-header.G { color: var(--G); text-shadow: 0 0 20px var(--G); }
+  .col-header.O { color: var(--O); text-shadow: 0 0 20px var(--O); }
+
+  .board-col {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .board-cell {
+    aspect-ratio: 1;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: clamp(0.7rem, 1.4vw, 1.1rem);
+    font-weight: 700;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.07);
+    color: rgba(255,255,255,0.3);
+    transition: background 0.4s, color 0.4s, transform 0.3s, box-shadow 0.4s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .board-cell.called {
+    color: #fff;
+    animation: cellPop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .board-cell.called.B { background: rgba(59,158,255,0.3);  border-color: rgba(59,158,255,0.5);  box-shadow: inset 0 0 12px rgba(59,158,255,0.2); }
+  .board-cell.called.I { background: rgba(255,77,77,0.3);   border-color: rgba(255,77,77,0.5);   box-shadow: inset 0 0 12px rgba(255,77,77,0.2); }
+  .board-cell.called.N { background: rgba(238,238,238,0.2); border-color: rgba(238,238,238,0.4); box-shadow: inset 0 0 12px rgba(238,238,238,0.1); }
+  .board-cell.called.G { background: rgba(46,204,113,0.3);  border-color: rgba(46,204,113,0.5);  box-shadow: inset 0 0 12px rgba(46,204,113,0.2); }
+  .board-cell.called.O { background: rgba(255,152,0,0.3);   border-color: rgba(255,152,0,0.5);   box-shadow: inset 0 0 12px rgba(255,152,0,0.2); }
+
+  .board-cell.current-highlight {
+    transform: scale(1.12);
+    z-index: 1;
+    box-shadow: 0 0 20px currentColor !important;
+  }
+
+  /* ─── Waiting Screen ────────────────────────────── */
+  #waiting-overlay {
+    position: fixed; inset: 0;
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 24px;
+    z-index: 50;
+    transition: opacity 0.6s;
+  }
+  #waiting-overlay.hidden { opacity: 0; pointer-events: none; }
+
+  #waiting-logo {
+    display: flex; gap: 6px;
+    font-size: clamp(3rem, 8vw, 7rem);
+    font-weight: 900;
+    letter-spacing: 12px;
+  }
+  #waiting-logo .B { color: var(--B); animation: pulse 2s ease-in-out 0s    infinite; }
+  #waiting-logo .I { color: var(--I); animation: pulse 2s ease-in-out 0.2s  infinite; }
+  #waiting-logo .N { color: var(--N); animation: pulse 2s ease-in-out 0.4s  infinite; }
+  #waiting-logo .G { color: var(--G); animation: pulse 2s ease-in-out 0.6s  infinite; }
+  #waiting-logo .O { color: var(--O); animation: pulse 2s ease-in-out 0.8s  infinite; }
+
+  #waiting-text { color: var(--muted); font-size: 1.1rem; letter-spacing: 3px; text-transform: uppercase; }
+
+  /* ─── Game Over Banner ──────────────────────────── */
+  #gameover-banner {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.8);
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 60;
+    gap: 20px;
+  }
+  #gameover-banner.show { display: flex; }
+  #gameover-banner h1 {
+    font-size: clamp(3rem, 10vw, 8rem);
+    font-weight: 900;
+    background: linear-gradient(135deg, var(--B), var(--G), var(--O));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+  #gameover-banner p { color: var(--muted); font-size: 1.2rem; }
+
+  /* ─── Confetti ──────────────────────────────────── */
+  #confetti-canvas {
+    position: fixed; inset: 0;
+    pointer-events: none;
+    z-index: 55;
+  }
+
+  /* ─── Animations ────────────────────────────────── */
+  @keyframes popIn {
+    0%   { transform: scale(0.4) rotate(-10deg); opacity: 0; }
+    60%  { transform: scale(1.15) rotate(3deg); }
+    100% { transform: scale(1) rotate(0deg); opacity: 1; }
+  }
+
+  @keyframes cellPop {
+    0%   { transform: scale(0.6); }
+    70%  { transform: scale(1.15); }
+    100% { transform: scale(1); }
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.4; }
+  }
+
+  @keyframes slideIn {
+    from { transform: translateX(-30px); opacity: 0; }
+    to   { transform: translateX(0);     opacity: 1; }
+  }
+
+  /* ─── Auto-draw indicator ───────────────────────── */
+  #auto-indicator {
+    font-size: 0.7rem;
+    color: var(--G);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    opacity: 0;
+    transition: opacity 0.3s;
+    text-align: center;
+  }
+  #auto-indicator.active { opacity: 1; animation: pulse 1.5s ease-in-out infinite; }
+</style>
+</head>
+<body>
+
+<!-- Waiting overlay (shown until first ball is drawn) -->
+<div id="waiting-overlay">
+  <div id="waiting-logo">
+    <span class="B">B</span>
+    <span class="I">I</span>
+    <span class="N">N</span>
+    <span class="G">G</span>
+    <span class="O">O</span>
+  </div>
+  <div id="waiting-text">Waiting for game to start…</div>
+</div>
+
+<!-- Game Over banner -->
+<div id="gameover-banner">
+  <h1>All Balls Called!</h1>
+  <p>75 of 75 balls drawn</p>
+</div>
+
+<!-- Confetti canvas -->
+<canvas id="confetti-canvas"></canvas>
+
+<!-- Main layout -->
+<div id="root">
+
+  <!-- Header -->
+  <div id="header">
+    <div id="logo">
+      <span class="B">B</span>
+      <span class="I">I</span>
+      <span class="N">N</span>
+      <span class="G">G</span>
+      <span class="O">O</span>
+    </div>
+    <div id="status-bar">
+      <div>
+        <span id="conn-dot"></span>
+        <span id="conn-label">Connecting…</span>
+      </div>
+      <div id="ball-count">0 / 75 drawn</div>
+    </div>
+  </div>
+
+  <!-- Middle: current ball + board -->
+  <div id="middle">
+
+    <!-- Left: current ball + recent -->
+    <div id="current-ball-wrap">
+      <div id="current-ball">
+        <span id="ball-letter">—</span>
+        <span id="ball-number">?</span>
+        <span id="ball-label-full">NEXT BALL</span>
+      </div>
+      <div id="auto-indicator">⏱ AUTO DRAW</div>
+      <div id="recent-balls">
+        <div id="recent-label">Last Drawn</div>
+        <div id="recent-list"></div>
+      </div>
+    </div>
+
+    <!-- Right: full board -->
+    <div id="board-wrap">
+      <div id="board"></div>
+    </div>
+
+  </div>
+
+</div>
+
+<script>
+// ─── Build the board ──────────────────────────────────────────────────────────
+const LETTERS = ['B','I','N','G','O'];
+const COLORS  = { B:'#3B9EFF', I:'#FF4D4D', N:'#EEEEEE', G:'#2ECC71', O:'#FF9800' };
+
+const boardEl = document.getElementById('board');
+const cells   = {}; // num → td element
+
+// Build header row per column
+LETTERS.forEach(letter => {
+  const col = document.createElement('div');
+  col.className = 'board-col';
+
+  const hdr = document.createElement('div');
+  hdr.className = `col-header ${letter}`;
+  hdr.textContent = letter;
+  col.appendChild(hdr);
+
+  // numbers for this letter
+  const start = { B:1, I:16, N:31, G:46, O:61 }[letter];
+  for (let n = start; n < start + 15; n++) {
+    const cell = document.createElement('div');
+    cell.className = 'board-cell';
+    cell.textContent = n;
+    cell.id = `cell-${n}`;
+    col.appendChild(cell);
+    cells[n] = cell;
+  }
+
+  boardEl.appendChild(col);
+});
+
+// ─── State ────────────────────────────────────────────────────────────────────
+let calledBalls    = [];
+let currentBall    = null;
+let lastHighlighted = null;
+let autoSpeed       = 0;
+
+// ─── WebSocket ────────────────────────────────────────────────────────────────
+const WS_URL = `ws://${location.host}`;
+let ws;
+let reconnectTimer = null;
+
+function connect() {
+  ws = new WebSocket(WS_URL);
+
+  ws.onopen = () => {
+    setConnected(true);
+    ws.send(JSON.stringify({ type: 'getState' }));
+  };
+
+  ws.onclose = () => {
+    setConnected(false);
+    reconnectTimer = setTimeout(connect, 2500);
+  };
+
+  ws.onerror = () => setConnected(false);
+
+  ws.onmessage = ({ data }) => {
+    try {
+      const msg = JSON.parse(data);
+      handleMsg(msg);
+    } catch {}
+  };
+}
+
+function handleMsg(msg) {
+  switch (msg.type) {
+    case 'state':
+      applyFullState(msg.state);
+      break;
+    case 'ballDrawn':
+      applyFullState(msg.state);
+      animateBallDraw(msg.ball);
+      playDrawSound();
+      announceBall(msg.ball);
+      break;
+    case 'reset':
+      applyFullState(msg.state);
+      playResetSound();
+      break;
+    case 'gameOver':
+      applyFullState(msg.state);
+      showGameOver();
+      break;
+    case 'autoSpeed':
+      autoSpeed = msg.speed;
+      document.getElementById('auto-indicator').classList.toggle('active', autoSpeed > 0);
+      break;
+  }
+}
+
+function applyFullState(state) {
+  calledBalls = state.calledBalls || [];
+  currentBall = state.currentBall;
+  autoSpeed   = state.autoSpeed || 0;
+
+  // Update board cells
+  for (const n in cells) {
+    const letter = LETTER(Number(n));
+    cells[n].className = 'board-cell';
+    if (calledBalls.find(b => b.num === Number(n))) {
+      cells[n].classList.add('called', letter);
+    }
+  }
+
+  // Update current ball display
+  if (currentBall) {
+    updateCurrentBall(currentBall);
+    highlightCell(currentBall.num);
+  }
+
+  // Update recent balls
+  updateRecentBalls();
+
+  // Update ball count
+  document.getElementById('ball-count').textContent =
+    `${calledBalls.length} / 75 drawn`;
+
+  // Auto indicator
+  document.getElementById('auto-indicator').classList.toggle('active', autoSpeed > 0);
+
+  // Waiting overlay
+  if (calledBalls.length > 0) {
+    document.getElementById('waiting-overlay').classList.add('hidden');
+  }
+
+  // Game over
+  if (state.status === 'finished') showGameOver();
+}
+
+function animateBallDraw(ball) {
+  document.getElementById('waiting-overlay').classList.add('hidden');
+  document.getElementById('gameover-banner').classList.remove('show');
+  updateCurrentBall(ball, true);
+  highlightCell(ball.num);
+  updateRecentBalls();
+  document.getElementById('ball-count').textContent =
+    `${calledBalls.length} / 75 drawn`;
+}
+
+function updateCurrentBall(ball, animate = false) {
+  const wrap = document.getElementById('current-ball');
+  wrap.className = `has-ball ${ball.letter}`;
+  if (animate) {
+    wrap.style.animation = 'none';
+    wrap.offsetHeight; // reflow
+    wrap.style.animation = '';
+  }
+  document.getElementById('ball-letter').textContent = ball.letter;
+  document.getElementById('ball-letter').style.color = COLORS[ball.letter];
+  document.getElementById('ball-number').textContent = ball.num;
+  document.getElementById('ball-number').style.color = COLORS[ball.letter];
+  document.getElementById('ball-label-full').textContent = ball.label;
+}
+
+function highlightCell(num) {
+  if (lastHighlighted !== null && cells[lastHighlighted]) {
+    cells[lastHighlighted].classList.remove('current-highlight');
+  }
+  if (cells[num]) {
+    cells[num].classList.add('current-highlight');
+    lastHighlighted = num;
+  }
+}
+
+function updateRecentBalls() {
+  const list = document.getElementById('recent-list');
+  list.innerHTML = '';
+  const recent = [...calledBalls].reverse().slice(0, 5);
+  recent.forEach((ball, i) => {
+    const el = document.createElement('div');
+    el.className = `recent-ball ${ball.letter}`;
+    el.innerHTML = `<span class="rb-letter">${ball.letter}</span><span class="rb-num">${ball.num}</span>`;
+    list.appendChild(el);
+  });
+}
+
+function showGameOver() {
+  document.getElementById('gameover-banner').classList.add('show');
+  playGameOverSound();
+  startConfetti();
+}
+
+// ─── LETTER helper ───────────────────────────────────────────────────────────
+function LETTER(n) {
+  return n <= 15 ? 'B' : n <= 30 ? 'I' : n <= 45 ? 'N' : n <= 60 ? 'G' : 'O';
+}
+
+// ─── Connection status ────────────────────────────────────────────────────────
+function setConnected(ok) {
+  const dot   = document.getElementById('conn-dot');
+  const label = document.getElementById('conn-label');
+  dot.className   = ok ? 'connected' : 'error';
+  label.textContent = ok ? 'Connected' : 'Reconnecting…';
+}
+
+// ─── Web Audio: Sounds ────────────────────────────────────────────────────────
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+function playTone(freq, start, dur, type = 'sine', vol = 0.3) {
+  const osc  = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, audioCtx.currentTime + start);
+  gain.gain.setValueAtTime(0, audioCtx.currentTime + start);
+  gain.gain.linearRampToValueAtTime(vol, audioCtx.currentTime + start + 0.01);
+  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + start + dur);
+  osc.start(audioCtx.currentTime + start);
+  osc.stop(audioCtx.currentTime + start + dur + 0.05);
+}
+
+function playDrawSound() {
+  // Ascending 3-note chime
+  playTone(523, 0,    0.3, 'sine', 0.28);   // C5
+  playTone(659, 0.12, 0.3, 'sine', 0.28);   // E5
+  playTone(784, 0.24, 0.5, 'sine', 0.32);   // G5
+}
+
+function playResetSound() {
+  // Descending sweep
+  playTone(784, 0,    0.2, 'triangle', 0.2);
+  playTone(523, 0.15, 0.2, 'triangle', 0.2);
+  playTone(392, 0.3,  0.3, 'triangle', 0.2);
+}
+
+function playGameOverSound() {
+  // Triumphant fanfare
+  const notes = [523, 659, 784, 1047, 784, 1047];
+  const times = [0, 0.15, 0.3, 0.5, 0.7, 0.9];
+  notes.forEach((f, i) => playTone(f, times[i], 0.4, 'sine', 0.35));
+}
+
+// ─── Web Speech: Announce ball ────────────────────────────────────────────────
+const synth = window.speechSynthesis;
+let voices = [];
+function loadVoices() {
+  voices = synth.getVoices();
+}
+if (synth) {
+  synth.addEventListener('voiceschanged', loadVoices);
+  loadVoices();
+}
+
+function announceBall(ball) {
+  if (!synth) return;
+  // Spell out the letter then say the number
+  const text = `${ball.letter}. ${ball.num}`;
+  const utt  = new SpeechSynthesisUtterance(text);
+  utt.rate   = 0.85;
+  utt.pitch  = 1.05;
+  utt.volume = 0.9;
+  // Prefer a clear English voice if available
+  const preferred = voices.find(v => v.lang.startsWith('en') && v.name.toLowerCase().includes('google'))
+    || voices.find(v => v.lang.startsWith('en'))
+    || null;
+  if (preferred) utt.voice = preferred;
+  // Small delay so chime plays first
+  setTimeout(() => synth.speak(utt), 400);
+}
+
+// ─── Confetti ─────────────────────────────────────────────────────────────────
+const confCanvas = document.getElementById('confetti-canvas');
+const confCtx    = confCanvas.getContext('2d');
+let confettiPieces = [];
+let confettiRunning = false;
+
+function startConfetti() {
+  confCanvas.width  = window.innerWidth;
+  confCanvas.height = window.innerHeight;
+  confettiPieces = Array.from({ length: 200 }, () => ({
+    x: Math.random() * confCanvas.width,
+    y: Math.random() * -confCanvas.height,
+    w: Math.random() * 12 + 6,
+    h: Math.random() * 6 + 4,
+    color: ['#3B9EFF','#FF4D4D','#2ECC71','#FF9800','#A855F7','#FFD700'][Math.floor(Math.random()*6)],
+    speed: Math.random() * 3 + 2,
+    angle: Math.random() * 360,
+    spin: (Math.random() - 0.5) * 6,
+    drift: (Math.random() - 0.5) * 2,
+  }));
+  confettiRunning = true;
+  requestAnimationFrame(drawConfetti);
+}
+
+function drawConfetti() {
+  if (!confettiRunning) return;
+  confCtx.clearRect(0, 0, confCanvas.width, confCanvas.height);
+  let alive = 0;
+  confettiPieces.forEach(p => {
+    p.y     += p.speed;
+    p.x     += p.drift;
+    p.angle += p.spin;
+    if (p.y < confCanvas.height + 20) alive++;
+    confCtx.save();
+    confCtx.translate(p.x, p.y);
+    confCtx.rotate(p.angle * Math.PI / 180);
+    confCtx.fillStyle = p.color;
+    confCtx.fillRect(-p.w/2, -p.h/2, p.w, p.h);
+    confCtx.restore();
+  });
+  if (alive > 0) requestAnimationFrame(drawConfetti);
+  else {
+    confettiRunning = false;
+    confCtx.clearRect(0, 0, confCanvas.width, confCanvas.height);
+  }
+}
+
+// ─── Resize confetti canvas ───────────────────────────────────────────────────
+window.addEventListener('resize', () => {
+  confCanvas.width  = window.innerWidth;
+  confCanvas.height = window.innerHeight;
+});
+
+// ─── Boot ─────────────────────────────────────────────────────────────────────
+connect();
+</script>
+</body>
+</html>

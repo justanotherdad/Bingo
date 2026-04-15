@@ -1,8 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { playDrawChime, resumeAudioContext } from "@/lib/audio/drawChime";
-import type { BallPreset } from "@/lib/bingo";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
+import {
+  playDrawChime,
+  playGameOverFanfare,
+  resumeAudioContext,
+} from "@/lib/audio/drawChime";
+import { letterForNumber, type BallPreset } from "@/lib/bingo";
 import { BingoStage } from "@/components/display/BingoStage";
 
 type DrawPayload = {
@@ -22,6 +27,34 @@ type ApiResponse = {
 
 const SOUND_KEY = "bingo-display-sound";
 
+// ─── Speech synthesis ─────────────────────────────────────────────────────────
+let speechVoices: SpeechSynthesisVoice[] = [];
+
+function loadVoices() {
+  if (typeof window === "undefined" || !window.speechSynthesis) return;
+  speechVoices = window.speechSynthesis.getVoices();
+}
+
+function announceNumber(number: number, letter: string | null) {
+  if (typeof window === "undefined" || !window.speechSynthesis) return;
+  // e.g. "B. 7"  or just "64" for UK-90
+  const label = letter ? `${letter}. ${number}` : String(number);
+  const utt = new SpeechSynthesisUtterance(label);
+  utt.rate = 0.88;
+  utt.pitch = 1.05;
+  utt.volume = 0.95;
+  const preferred =
+    speechVoices.find(
+      (v) => v.lang.startsWith("en") && /google|natural/i.test(v.name)
+    ) ??
+    speechVoices.find((v) => v.lang.startsWith("en")) ??
+    undefined;
+  if (preferred) utt.voice = preferred;
+  // Delay so the draw chime plays first
+  window.setTimeout(() => window.speechSynthesis.speak(utt), 500);
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
 export function DisplayClient({
   gameId,
   token,
@@ -34,89 +67,156 @@ export function DisplayClient({
   const [animNonce, setAnimNonce] = useState(0);
   const [soundOn, setSoundOn] = useState(true);
   const [unlocked, setUnlocked] = useState(false);
+  const [realtimeOk, setRealtimeOk] = useState<boolean | null>(null);
 
-  const soundOnRef = useRef(soundOn);
+  const soundOnRef  = useRef(soundOn);
   const unlockedRef = useRef(unlocked);
-  useEffect(() => {
-    soundOnRef.current = soundOn;
-  }, [soundOn]);
-  useEffect(() => {
-    unlockedRef.current = unlocked;
-  }, [unlocked]);
+  const lastLatestId   = useRef<string | null>(null);
+  const firstLoad      = useRef(true);
+  const presetRef      = useRef<BallPreset>("US-75");
 
-  const firstPoll = useRef(true);
-  const lastLatestId = useRef<string | null>(null);
+  useEffect(() => { soundOnRef.current  = soundOn;  }, [soundOn]);
+  useEffect(() => { unlockedRef.current = unlocked; }, [unlocked]);
 
+  // Load persisted sound preference + speech voices
   useEffect(() => {
     try {
-      const v = localStorage.getItem(SOUND_KEY);
-      if (v === "0") setSoundOn(false);
-    } catch {
-      /* ignore */
+      if (localStorage.getItem(SOUND_KEY) === "0") setSoundOn(false);
+    } catch { /* ignore */ }
+    loadVoices();
+    if (typeof window !== "undefined" && window.speechSynthesis) {
+      window.speechSynthesis.addEventListener("voiceschanged", loadVoices);
     }
+    return () => {
+      if (typeof window !== "undefined" && window.speechSynthesis) {
+        window.speechSynthesis.removeEventListener("voiceschanged", loadVoices);
+      }
+    };
   }, []);
 
+  // Reset refs on game change
   useEffect(() => {
-    firstPoll.current = true;
     lastLatestId.current = null;
+    firstLoad.current = true;
   }, [gameId, token]);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    async function poll() {
-      try {
-        const r = await fetch(
-          `/api/game/${gameId}/display?t=${encodeURIComponent(token)}`,
-          { cache: "no-store" }
-        );
-        const json = (await r.json()) as ApiResponse;
-        if (cancelled) return;
-        if (!r.ok) {
-          setError(json.error ?? "Could not load game");
-          setData(null);
-          return;
-        }
-        setError(null);
-        setData(json);
-
-        const latest = json.latest;
-        if (latest) {
-          const isFirstPoll = firstPoll.current;
-          const changed = lastLatestId.current !== latest.id;
-          if (!isFirstPoll && changed) {
-            setAnimNonce((n) => n + 1);
-            if (soundOnRef.current && unlockedRef.current) {
-              void resumeAudioContext();
-              playDrawChime();
-            }
-          }
-          lastLatestId.current = latest.id;
-        } else {
-          lastLatestId.current = null;
-        }
-        firstPoll.current = false;
-      } catch {
-        if (!cancelled) setError("Network error");
-      }
+  // ── Shared: fire animation + sound + speech ────────────────────────────────
+  function triggerNewBall(number: number, preset: BallPreset) {
+    const letter = letterForNumber(preset, number);
+    setAnimNonce((n) => n + 1);
+    if (soundOnRef.current && unlockedRef.current) {
+      void resumeAudioContext();
+      playDrawChime();
     }
+    if (unlockedRef.current) announceNumber(number, letter);
+  }
 
-    void poll();
-    const id = window.setInterval(poll, 500);
-    return () => {
-      cancelled = true;
-      window.clearInterval(id);
-    };
+  function triggerGameOver() {
+    if (soundOnRef.current && unlockedRef.current) {
+      void resumeAudioContext();
+      playGameOverFanfare();
+    }
+  }
+
+  // ── REST fetch ─────────────────────────────────────────────────────────────
+  const fetchState = useCallback(async () => {
+    try {
+      const url =
+        `${window.location.origin}/api/game/${encodeURIComponent(gameId)}/display` +
+        `?t=${encodeURIComponent(token)}`;
+      const r    = await fetch(url, { cache: "no-store" });
+      const text = await r.text();
+
+      let json: ApiResponse;
+      try { json = JSON.parse(text) as ApiResponse; }
+      catch {
+        setError(r.ok ? "Invalid server response." : `Server error (${r.status}).`);
+        return;
+      }
+      if (!r.ok) { setError(json.error ?? "Could not load game"); setData(null); return; }
+
+      setError(null);
+      setData(json);
+      presetRef.current = json.ball_preset;
+
+      // Check for new ball caught by polling (Realtime may have missed it)
+      const latest = json.latest;
+      if (latest && !firstLoad.current && lastLatestId.current !== latest.id) {
+        lastLatestId.current = latest.id;
+        triggerNewBall(latest.number, json.ball_preset);
+      } else if (latest) {
+        lastLatestId.current = latest.id;
+      }
+      firstLoad.current = false;
+
+      if (json.status !== "active") triggerGameOver();
+    } catch {
+      setError("Network error — retrying…");
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gameId, token]);
 
+  // ── Supabase Realtime + polling fallback ───────────────────────────────────
+  useEffect(() => {
+    void fetchState(); // initial load
+
+    const supabase = createClient();
+
+    const channel = supabase
+      .channel(`bingo-draws-${gameId}`)
+      // Instant notification when a new draw is inserted
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "draws", filter: `game_id=eq.${gameId}` },
+        (payload) => {
+          const row = payload.new as { id: string; number: number; draw_order: number };
+
+          // Skip if we already processed this (e.g., polling caught it first)
+          if (lastLatestId.current === row.id) return;
+          lastLatestId.current = row.id;
+
+          // Optimistically append draw to local state (instant UI update)
+          setData((prev) => {
+            if (!prev) return prev;
+            if (prev.draws.some((d) => d.id === row.id)) return prev;
+            const newDraw: DrawPayload = {
+              id: row.id,
+              number: row.number,
+              draw_order: row.draw_order,
+              created_at: new Date().toISOString(),
+            };
+            return { ...prev, draws: [...prev.draws, newDraw], latest: newDraw };
+          });
+
+          if (!firstLoad.current) {
+            triggerNewBall(row.number, presetRef.current);
+          }
+          firstLoad.current = false;
+        }
+      )
+      // Watch for game status changes (completed / cancelled)
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "games", filter: `id=eq.${gameId}` },
+        () => void fetchState()
+      )
+      .subscribe((status) => setRealtimeOk(status === "SUBSCRIBED"));
+
+    // Polling fallback at 5 s — catches any events Realtime missed
+    const pollTimer = window.setInterval(() => void fetchState(), 5000);
+
+    return () => {
+      void supabase.removeChannel(channel);
+      window.clearInterval(pollTimer);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gameId, token]);
+
+  // ── Handlers ──────────────────────────────────────────────────────────────
   function toggleSound() {
     const next = !soundOn;
     setSoundOn(next);
-    try {
-      localStorage.setItem(SOUND_KEY, next ? "1" : "0");
-    } catch {
-      /* ignore */
-    }
+    try { localStorage.setItem(SOUND_KEY, next ? "1" : "0"); } catch { /* ignore */ }
   }
 
   async function unlockFromGesture() {
@@ -125,12 +225,14 @@ export function DisplayClient({
     setUnlocked(true);
   }
 
+  // ── Render ────────────────────────────────────────────────────────────────
   if (error && !data) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-4 p-8 text-center">
-        <p className="text-lg text-red-300">{error}</p>
-        <p className="max-w-md text-sm text-muted">
-          Check the display link (game id + token). The game may have ended.
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4 p-8 text-center"
+        style={{ backgroundColor: "#09090b", color: "#fecaca", minHeight: "100vh" }}>
+        <p className="text-lg">{error}</p>
+        <p className="max-w-md text-sm opacity-80">
+          Check the display link. The game may have ended or the token may be wrong.
         </p>
       </div>
     );
@@ -138,40 +240,66 @@ export function DisplayClient({
 
   if (!data) {
     return (
-      <div className="flex min-h-screen items-center justify-center text-muted">
-        Loading…
+      <div className="flex min-h-screen items-center justify-center"
+        style={{ backgroundColor: "#09090b", color: "#a1a1aa", minHeight: "100vh" }}>
+        <div className="text-center">
+          <div className="mb-3 text-5xl font-black tracking-widest opacity-20">BINGO</div>
+          <p>Loading display…</p>
+        </div>
       </div>
     );
   }
 
   if (data.status !== "active") {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-2 p-8 text-center">
-        <p className="text-xl font-semibold text-foreground">Game ended</p>
-        <p className="text-sm text-muted">You can close this window.</p>
+      <div className="flex min-h-screen flex-col items-center justify-center gap-3 p-8 text-center"
+        style={{ backgroundColor: "#09090b", color: "#fafafa", minHeight: "100vh" }}>
+        <div className="text-6xl font-black tracking-widest opacity-25">BINGO</div>
+        <p className="text-2xl font-semibold">Game over</p>
+        <p className="text-sm opacity-60">
+          {data.draws.length} of {data.ball_preset === "US-75" ? 75 : 90} balls were called.
+        </p>
+        <p className="mt-2 text-sm opacity-40">You can close this window.</p>
       </div>
     );
   }
 
   return (
     <div className="relative min-h-screen overflow-hidden">
-      <div className="pointer-events-auto absolute right-4 top-4 z-20 flex flex-wrap items-center gap-2">
+      {/* Top-right controls */}
+      <div className="pointer-events-auto absolute right-3 top-3 z-20 flex items-center gap-2">
+        {/* Realtime dot */}
+        <span
+          title={
+            realtimeOk === true  ? "Live via Realtime" :
+            realtimeOk === false ? "Using polling fallback" :
+            "Connecting…"
+          }
+          className="h-2 w-2 rounded-full"
+          style={{
+            background:
+              realtimeOk === true  ? "#22c55e" :
+              realtimeOk === false ? "#f59e0b" : "#6b7280",
+            boxShadow: realtimeOk === true ? "0 0 6px #22c55e" : "none",
+          }}
+        />
         {!unlocked ? (
           <button
             type="button"
-            onClick={unlockFromGesture}
-            className="rounded-md border border-border bg-card/90 px-3 py-2 text-xs font-medium text-foreground shadow-lg backdrop-blur"
+            onClick={() => void unlockFromGesture()}
+            className="rounded border border-white/20 bg-black/60 px-2.5 py-1 text-xs font-medium text-white/80 backdrop-blur transition hover:bg-black/80"
           >
-            Tap to enable sound
+            🔊 Enable sound
           </button>
-        ) : null}
-        <button
-          type="button"
-          onClick={toggleSound}
-          className="rounded-md border border-border bg-card/90 px-3 py-2 text-xs font-medium text-foreground shadow-lg backdrop-blur"
-        >
-          Sound: {soundOn ? "on" : "off"}
-        </button>
+        ) : (
+          <button
+            type="button"
+            onClick={toggleSound}
+            className="rounded border border-white/20 bg-black/60 px-2.5 py-1 text-xs font-medium text-white/80 backdrop-blur transition hover:bg-black/80"
+          >
+            {soundOn ? "🔊" : "🔇"} Sound {soundOn ? "on" : "off"}
+          </button>
+        )}
       </div>
 
       <BingoStage

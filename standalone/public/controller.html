@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>🎮 Bingo Controller</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --B: #3B9EFF;
+    --I: #FF4D4D;
+    --N: #b0b0b0;
+    --G: #2ECC71;
+    --O: #FF9800;
+    --bg: #111827;
+    --surface: #1f2937;
+    --surface2: #283347;
+    --border: #374151;
+    --text: #f9fafb;
+    --muted: #9ca3af;
+    --accent: #6366f1;
+    --accent-hover: #818cf8;
+    --danger: #ef4444;
+    --danger-hover: #f87171;
+  }
+
+  html, body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    min-height: 100vh;
+  }
+
+  #app {
+    max-width: 480px;
+    margin: 0 auto;
+    padding: 16px 16px 40px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  /* ─── Header ─────────────────────────────────────── */
+  #header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 0 4px;
+  }
+
+  #logo {
+    font-size: 1.6rem;
+    font-weight: 900;
+    letter-spacing: 4px;
+    display: flex; gap: 1px;
+  }
+  #logo .B { color: var(--B); }
+  #logo .I { color: var(--I); }
+  #logo .N { color: var(--N); }
+  #logo .G { color: var(--G); }
+  #logo .O { color: var(--O); }
+
+  #header-right { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+
+  #conn-status {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 0.75rem; color: var(--muted);
+  }
+  .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: #555; transition: background 0.3s;
+    flex-shrink: 0;
+  }
+  .dot.connected { background: var(--G); box-shadow: 0 0 6px var(--G); }
+  .dot.error     { background: var(--danger); }
+
+  /* ─── Stats bar ──────────────────────────────────── */
+  #stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+  }
+
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 10px;
+    text-align: center;
+  }
+  .stat-value {
+    font-size: 1.8rem;
+    font-weight: 800;
+    line-height: 1;
+    color: var(--text);
+  }
+  .stat-label {
+    font-size: 0.65rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-top: 4px;
+  }
+
+  /* ─── Draw button ────────────────────────────────── */
+  #draw-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+
+  #draw-btn {
+    width: 100%;
+    padding: 22px;
+    border-radius: 16px;
+    border: none;
+    font-size: 1.5rem;
+    font-weight: 900;
+    letter-spacing: 3px;
+    cursor: pointer;
+    background: linear-gradient(135deg, var(--B), var(--accent));
+    color: #fff;
+    text-transform: uppercase;
+    box-shadow: 0 8px 32px rgba(99,102,241,0.35);
+    transition: transform 0.12s, box-shadow 0.12s, opacity 0.2s;
+    position: relative;
+    overflow: hidden;
+  }
+  #draw-btn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 36px rgba(99,102,241,0.45);
+  }
+  #draw-btn:active:not(:disabled) {
+    transform: translateY(1px);
+    box-shadow: 0 4px 16px rgba(99,102,241,0.3);
+  }
+  #draw-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    box-shadow: none;
+  }
+
+  /* ripple */
+  #draw-btn::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: white;
+    opacity: 0;
+    border-radius: inherit;
+    transition: opacity 0.15s;
+  }
+  #draw-btn:active:not(:disabled)::after { opacity: 0.12; }
+
+  /* ─── Auto draw ──────────────────────────────────── */
+  #auto-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 14px 16px;
+  }
+
+  #auto-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+
+  #auto-title {
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--muted);
+  }
+
+  /* Toggle switch */
+  .toggle-wrap { display: flex; align-items: center; gap: 8px; }
+  .toggle-label { font-size: 0.8rem; color: var(--muted); }
+
+  .toggle {
+    position: relative;
+    width: 44px; height: 24px;
+    cursor: pointer;
+  }
+  .toggle input { display: none; }
+  .toggle-slider {
+    position: absolute; inset: 0;
+    background: #374151;
+    border-radius: 12px;
+    transition: background 0.3s;
+  }
+  .toggle-slider::before {
+    content: '';
+    position: absolute;
+    width: 18px; height: 18px;
+    left: 3px; top: 3px;
+    background: #fff;
+    border-radius: 50%;
+    transition: transform 0.3s;
+  }
+  .toggle input:checked + .toggle-slider { background: var(--G); }
+  .toggle input:checked + .toggle-slider::before { transform: translateX(20px); }
+
+  /* Speed chips */
+  #speed-chips {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .speed-chip {
+    padding: 7px 14px;
+    border-radius: 20px;
+    border: 1.5px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: border-color 0.2s, color 0.2s, background 0.2s;
+  }
+  .speed-chip:hover { border-color: var(--accent); color: var(--text); }
+  .speed-chip.active {
+    border-color: var(--G);
+    background: rgba(46,204,113,0.12);
+    color: var(--G);
+  }
+
+  #auto-countdown {
+    margin-top: 10px;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--border);
+    overflow: hidden;
+    display: none;
+  }
+  #auto-countdown.running { display: block; }
+  #countdown-bar {
+    height: 100%;
+    background: var(--G);
+    border-radius: 2px;
+    width: 100%;
+    transform-origin: left;
+    transition: none;
+  }
+
+  /* ─── Current ball card ──────────────────────────── */
+  #current-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    min-height: 80px;
+  }
+
+  #current-ball-display {
+    width: 64px; height: 64px;
+    border-radius: 50%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid var(--border);
+    flex-shrink: 0;
+    transition: border-color 0.3s, box-shadow 0.3s;
+  }
+  #current-ball-display.B { border-color: var(--B); box-shadow: 0 0 14px rgba(59,158,255,0.35); }
+  #current-ball-display.I { border-color: var(--I); box-shadow: 0 0 14px rgba(255,77,77,0.35); }
+  #current-ball-display.N { border-color: var(--N); box-shadow: 0 0 14px rgba(176,176,176,0.3); }
+  #current-ball-display.G { border-color: var(--G); box-shadow: 0 0 14px rgba(46,204,113,0.35); }
+  #current-ball-display.O { border-color: var(--O); box-shadow: 0 0 14px rgba(255,152,0,0.35); }
+
+  #cb-letter { font-size: 0.7rem; font-weight: 800; line-height: 1; }
+  #cb-number { font-size: 1.6rem; font-weight: 900; line-height: 1; }
+
+  #current-info { flex: 1; }
+  #current-info .label { font-size: 0.65rem; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+  #current-info .value { font-size: 1rem; font-weight: 700; margin-top: 2px; }
+  #current-info .sub   { font-size: 0.75rem; color: var(--muted); margin-top: 2px; }
+
+  /* ─── Display Link / QR ──────────────────────────── */
+  #display-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 14px 16px;
+  }
+
+  #display-section h3 {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--muted);
+    margin-bottom: 10px;
+    font-weight: 700;
+  }
+
+  #display-link-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  #display-url {
+    flex: 1;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 0.75rem;
+    color: var(--accent-hover);
+    font-family: monospace;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    cursor: pointer;
+    text-decoration: none;
+  }
+  #display-url:hover { color: #fff; border-color: var(--accent); }
+
+  #copy-btn {
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    color: var(--muted);
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: color 0.2s, border-color 0.2s;
+    white-space: nowrap;
+  }
+  #copy-btn:hover { color: var(--text); border-color: var(--accent); }
+  #copy-btn.copied { color: var(--G); border-color: var(--G); }
+
+  #qr-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+  #qr-code {
+    background: #fff;
+    padding: 10px;
+    border-radius: 10px;
+    display: inline-block;
+    line-height: 0;
+  }
+  #qr-hint { font-size: 0.7rem; color: var(--muted); text-align: center; }
+
+  /* ─── Called balls log ───────────────────────────── */
+  #called-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 14px 16px;
+  }
+
+  #called-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  #called-header h3 {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--muted);
+    font-weight: 700;
+  }
+
+  #called-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .called-chip {
+    padding: 4px 8px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    border: 1px solid;
+    animation: chipIn 0.3s ease;
+  }
+  .called-chip.B { color: var(--B); border-color: rgba(59,158,255,0.4);  background: rgba(59,158,255,0.08); }
+  .called-chip.I { color: var(--I); border-color: rgba(255,77,77,0.4);   background: rgba(255,77,77,0.08); }
+  .called-chip.N { color: var(--N); border-color: rgba(176,176,176,0.4); background: rgba(176,176,176,0.06); }
+  .called-chip.G { color: var(--G); border-color: rgba(46,204,113,0.4);  background: rgba(46,204,113,0.08); }
+  .called-chip.O { color: var(--O); border-color: rgba(255,152,0,0.4);   background: rgba(255,152,0,0.08); }
+
+  @keyframes chipIn {
+    from { transform: scale(0.6); opacity: 0; }
+    to   { transform: scale(1);   opacity: 1; }
+  }
+
+  /* ─── Reset button ───────────────────────────────── */
+  #reset-section { display: flex; gap: 10px; }
+
+  #reset-btn {
+    flex: 1;
+    padding: 14px;
+    border-radius: 12px;
+    border: 1.5px solid var(--danger);
+    background: transparent;
+    color: var(--danger);
+    font-size: 0.9rem;
+    font-weight: 700;
+    letter-spacing: 1px;
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: background 0.2s, color 0.2s;
+  }
+  #reset-btn:hover { background: rgba(239,68,68,0.12); }
+  #reset-btn.confirm {
+    background: var(--danger);
+    color: #fff;
+    animation: pulse 0.6s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.75; }
+  }
+
+  /* ─── Toast notification ─────────────────────────── */
+  #toast {
+    position: fixed;
+    bottom: 24px; left: 50%; transform: translateX(-50%) translateY(60px);
+    background: #1f2937;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 20px;
+    font-size: 0.85rem;
+    color: var(--text);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    transition: transform 0.3s;
+    pointer-events: none;
+    white-space: nowrap;
+    z-index: 100;
+  }
+  #toast.show { transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- Header -->
+  <div id="header">
+    <div id="logo">
+      <span class="B">B</span><span class="I">I</span>
+      <span class="N">N</span><span class="G">G</span>
+      <span class="O">O</span>
+    </div>
+    <div id="header-right">
+      <div id="conn-status">
+        <span class="dot" id="dot"></span>
+        <span id="conn-text">Connecting…</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div id="stats">
+    <div class="stat-card">
+      <div class="stat-value" id="stat-called">0</div>
+      <div class="stat-label">Called</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" id="stat-remaining">75</div>
+      <div class="stat-label">Remaining</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" id="stat-pct">0%</div>
+      <div class="stat-label">Complete</div>
+    </div>
+  </div>
+
+  <!-- Current ball -->
+  <div id="current-card">
+    <div id="current-ball-display">
+      <span id="cb-letter" style="color:var(--muted)">—</span>
+      <span id="cb-number" style="color:var(--muted)">?</span>
+    </div>
+    <div id="current-info">
+      <div class="label">Last Drawn</div>
+      <div class="value" id="current-label">No ball drawn yet</div>
+      <div class="sub"  id="current-sub">Press Draw to start the game</div>
+    </div>
+  </div>
+
+  <!-- Draw button -->
+  <div id="draw-section">
+    <button id="draw-btn" onclick="drawBall()">🎱 DRAW</button>
+  </div>
+
+  <!-- Auto-draw -->
+  <div id="auto-section">
+    <div id="auto-header">
+      <span id="auto-title">Auto Draw</span>
+      <label class="toggle-wrap">
+        <span class="toggle-label" id="auto-toggle-label">Off</span>
+        <label class="toggle">
+          <input type="checkbox" id="auto-toggle" onchange="toggleAuto(this.checked)">
+          <span class="toggle-slider"></span>
+        </label>
+      </label>
+    </div>
+    <div id="speed-chips">
+      <button class="speed-chip active" data-speed="5000"  onclick="setSpeed(5000)">5 s</button>
+      <button class="speed-chip"        data-speed="10000" onclick="setSpeed(10000)">10 s</button>
+      <button class="speed-chip"        data-speed="15000" onclick="setSpeed(15000)">15 s</button>
+      <button class="speed-chip"        data-speed="20000" onclick="setSpeed(20000)">20 s</button>
+      <button class="speed-chip"        data-speed="30000" onclick="setSpeed(30000)">30 s</button>
+    </div>
+    <div id="auto-countdown">
+      <div id="countdown-bar"></div>
+    </div>
+  </div>
+
+  <!-- Display link & QR -->
+  <div id="display-section">
+    <h3>📺 TV Display URL</h3>
+    <div id="display-link-row">
+      <a id="display-url" href="#" target="_blank">Loading…</a>
+      <button id="copy-btn" onclick="copyUrl()">Copy</button>
+    </div>
+    <div id="qr-wrap">
+      <div id="qr-code"></div>
+      <div id="qr-hint">Scan this QR code on your TV or Chromecast device</div>
+    </div>
+  </div>
+
+  <!-- Called balls -->
+  <div id="called-section">
+    <div id="called-header">
+      <h3>📋 Called Balls</h3>
+      <span id="called-count" style="font-size:0.75rem;color:var(--muted)">0 balls</span>
+    </div>
+    <div id="called-grid"></div>
+  </div>
+
+  <!-- Reset -->
+  <div id="reset-section">
+    <button id="reset-btn" onclick="confirmReset()">🔄 Reset Game</button>
+  </div>
+
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<!-- QR Code library -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+<script>
+// ─── State ────────────────────────────────────────────────────────────────────
+let gameState = {
+  calledBalls: [],
+  currentBall: null,
+  status: 'waiting',
+  autoSpeed: 0,
+  remaining: 75,
+};
+
+let selectedSpeed = 5000;
+let autoOn        = false;
+let resetPending  = false;
+let resetTimer    = null;
+let countdownInterval = null;
+let countdownStart    = null;
+
+// ─── WebSocket ────────────────────────────────────────────────────────────────
+const WS_URL = `ws://${location.host}`;
+let ws;
+
+function connect() {
+  ws = new WebSocket(WS_URL);
+
+  ws.onopen = () => {
+    setConn(true);
+    ws.send(JSON.stringify({ type: 'getState' }));
+  };
+
+  ws.onclose = () => {
+    setConn(false);
+    setTimeout(connect, 2500);
+  };
+
+  ws.onerror = () => setConn(false);
+
+  ws.onmessage = ({ data }) => {
+    try { handleMsg(JSON.parse(data)); } catch {}
+  };
+}
+
+function send(obj) {
+  if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj));
+}
+
+function handleMsg(msg) {
+  switch (msg.type) {
+    case 'state':
+      applyState(msg.state);
+      break;
+    case 'ballDrawn':
+      applyState(msg.state);
+      animateNewBall(msg.ball);
+      break;
+    case 'autoSpeed':
+      autoOn = msg.speed > 0;
+      document.getElementById('auto-toggle').checked = autoOn;
+      syncAutoUI();
+      break;
+    case 'reset':
+      applyState(msg.state);
+      showToast('🔄 Game reset!');
+      stopCountdown();
+      break;
+    case 'gameOver':
+      applyState(msg.state);
+      handleGameOver();
+      break;
+  }
+}
+
+function applyState(s) {
+  gameState = s;
+
+  // Stats
+  const called    = s.calledBalls.length;
+  const remaining = 75 - called;
+  const pct       = Math.round((called / 75) * 100);
+
+  document.getElementById('stat-called').textContent    = called;
+  document.getElementById('stat-remaining').textContent = remaining;
+  document.getElementById('stat-pct').textContent       = pct + '%';
+
+  // Current ball
+  if (s.currentBall) updateCurrentBallCard(s.currentBall);
+
+  // Called balls grid
+  renderCalledGrid(s.calledBalls);
+
+  // Draw button
+  const drawBtn = document.getElementById('draw-btn');
+  drawBtn.disabled = s.status === 'finished' || autoOn;
+
+  // Auto state sync
+  autoOn = (s.autoSpeed || 0) > 0;
+  document.getElementById('auto-toggle').checked = autoOn;
+
+  // Set selected speed to match server
+  if (s.autoSpeed > 0) selectedSpeed = s.autoSpeed;
+  syncSpeedChips();
+  syncAutoUI();
+}
+
+function animateNewBall(ball) {
+  updateCurrentBallCard(ball, true);
+  renderCalledGrid(gameState.calledBalls);
+  if (autoOn) restartCountdown();
+}
+
+function updateCurrentBallCard(ball, animate = false) {
+  const wrap = document.getElementById('current-ball-display');
+  const COLORS = { B:'#3B9EFF', I:'#FF4D4D', N:'#b0b0b0', G:'#2ECC71', O:'#FF9800' };
+
+  wrap.className = ball.letter;
+  document.getElementById('cb-letter').textContent  = ball.letter;
+  document.getElementById('cb-letter').style.color  = COLORS[ball.letter];
+  document.getElementById('cb-number').textContent  = ball.num;
+  document.getElementById('cb-number').style.color  = COLORS[ball.letter];
+  document.getElementById('current-label').textContent = `${ball.letter}-${ball.num}`;
+  document.getElementById('current-sub').textContent   =
+    `Ball ${gameState.calledBalls.length} of 75`;
+
+  if (animate) {
+    wrap.style.transform = 'scale(1.25)';
+    setTimeout(() => { wrap.style.transform = ''; wrap.style.transition = 'transform 0.3s'; }, 150);
+  }
+}
+
+function renderCalledGrid(balls) {
+  const grid = document.getElementById('called-grid');
+  grid.innerHTML = '';
+  const reversed = [...balls].reverse();
+  reversed.forEach(ball => {
+    const chip = document.createElement('span');
+    chip.className = `called-chip ${ball.letter}`;
+    chip.textContent = ball.label;
+    grid.appendChild(chip);
+  });
+  document.getElementById('called-count').textContent = `${balls.length} balls`;
+}
+
+// ─── Controls ─────────────────────────────────────────────────────────────────
+function drawBall() {
+  if (gameState.status === 'finished') return;
+  send({ type: 'draw' });
+}
+
+function toggleAuto(on) {
+  autoOn = on;
+  if (on) {
+    send({ type: 'autoSpeed', speed: selectedSpeed });
+    restartCountdown();
+    document.getElementById('draw-btn').disabled = true;
+  } else {
+    send({ type: 'autoSpeed', speed: 0 });
+    stopCountdown();
+    document.getElementById('draw-btn').disabled = gameState.status === 'finished';
+  }
+  syncAutoUI();
+}
+
+function setSpeed(ms) {
+  selectedSpeed = ms;
+  syncSpeedChips();
+  if (autoOn) {
+    send({ type: 'autoSpeed', speed: ms });
+    restartCountdown();
+  }
+}
+
+function syncSpeedChips() {
+  document.querySelectorAll('.speed-chip').forEach(c => {
+    c.classList.toggle('active', Number(c.dataset.speed) === selectedSpeed);
+  });
+}
+
+function syncAutoUI() {
+  document.getElementById('auto-toggle-label').textContent = autoOn ? 'On' : 'Off';
+  const countdown = document.getElementById('auto-countdown');
+  if (autoOn) countdown.classList.add('running');
+  else        countdown.classList.remove('running');
+}
+
+// ─── Countdown bar ────────────────────────────────────────────────────────────
+function restartCountdown() {
+  stopCountdown();
+  if (!autoOn) return;
+  countdownStart = Date.now();
+  const bar = document.getElementById('countdown-bar');
+  bar.style.transition = 'none';
+  bar.style.width = '100%';
+  bar.offsetHeight; // reflow
+  bar.style.transition = `width ${selectedSpeed}ms linear`;
+  bar.style.width = '0%';
+}
+
+function stopCountdown() {
+  const bar = document.getElementById('countdown-bar');
+  bar.style.transition = 'none';
+  bar.style.width = '100%';
+}
+
+// ─── Reset ────────────────────────────────────────────────────────────────────
+function confirmReset() {
+  const btn = document.getElementById('reset-btn');
+  if (!resetPending) {
+    resetPending = true;
+    btn.classList.add('confirm');
+    btn.textContent = '⚠️ Tap again to confirm reset';
+    resetTimer = setTimeout(() => {
+      resetPending = false;
+      btn.classList.remove('confirm');
+      btn.textContent = '🔄 Reset Game';
+    }, 3000);
+  } else {
+    clearTimeout(resetTimer);
+    resetPending = false;
+    btn.classList.remove('confirm');
+    btn.textContent = '🔄 Reset Game';
+    autoOn = false;
+    document.getElementById('auto-toggle').checked = false;
+    syncAutoUI();
+    stopCountdown();
+    send({ type: 'reset' });
+  }
+}
+
+function handleGameOver() {
+  showToast('🎉 All 75 balls drawn! Game complete!');
+  autoOn = false;
+  document.getElementById('auto-toggle').checked = false;
+  stopCountdown();
+  syncAutoUI();
+  document.getElementById('draw-btn').disabled = true;
+}
+
+// ─── Display URL & QR ─────────────────────────────────────────────────────────
+let qrGenerated = false;
+
+async function loadDisplayInfo() {
+  try {
+    const res  = await fetch('/api/info');
+    const info = await res.json();
+    const url  = `http://${info.ip}:${info.port}/display`;
+
+    const link = document.getElementById('display-url');
+    link.textContent = url;
+    link.href = url;
+
+    if (!qrGenerated) {
+      qrGenerated = true;
+      new QRCode(document.getElementById('qr-code'), {
+        text: url,
+        width: 160, height: 160,
+        colorDark: '#000000',
+        colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.M,
+      });
+    }
+  } catch (e) {
+    // Fallback to current host
+    const url = `${location.protocol}//${location.hostname}:${location.port || 3000}/display`;
+    document.getElementById('display-url').textContent = url;
+    document.getElementById('display-url').href = url;
+  }
+}
+
+function copyUrl() {
+  const url = document.getElementById('display-url').textContent;
+  navigator.clipboard.writeText(url).then(() => {
+    const btn = document.getElementById('copy-btn');
+    btn.textContent = '✓ Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => {
+      btn.textContent = 'Copy';
+      btn.classList.remove('copied');
+    }, 2000);
+  });
+}
+
+// ─── Connection status ────────────────────────────────────────────────────────
+function setConn(ok) {
+  const dot  = document.getElementById('dot');
+  const text = document.getElementById('conn-text');
+  dot.className  = 'dot ' + (ok ? 'connected' : 'error');
+  text.textContent = ok ? 'Connected' : 'Reconnecting…';
+}
+
+// ─── Toast ────────────────────────────────────────────────────────────────────
+let toastTimer = null;
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+// ─── Boot ─────────────────────────────────────────────────────────────────────
+connect();
+loadDisplayInfo();
+</script>
+</body>
+</html>
