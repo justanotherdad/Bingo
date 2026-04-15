@@ -24,22 +24,6 @@ const US75_COLS: { letter: "B" | "I" | "N" | "G" | "O"; start: number }[] = [
   { letter: "O", start: 61 },
 ];
 
-// ─── UK-90 layout: 9 columns × 10 rows ────────────────────────────────────
-function buildUK90Rows(): (number | null)[][] {
-  // Standard UK Bingo board: numbers 1-90, each row has 5 numbers across 9 columns
-  // Simple sequential layout for display purposes (not a playable card)
-  const rows: (number | null)[][] = [];
-  for (let row = 0; row < 9; row++) {
-    const r: (number | null)[] = [];
-    for (let col = 0; col < 10; col++) {
-      const n = row * 10 + col + 1;
-      r.push(n <= 90 ? n : null);
-    }
-    rows.push(r);
-  }
-  return rows;
-}
-
 // ─── Component ─────────────────────────────────────────────────────────────
 export function BingoStage({
   preset,
@@ -58,138 +42,244 @@ export function BingoStage({
   const totalBalls = preset === "US-75" ? 75 : 90;
   const remaining  = totalBalls - draws.length;
 
-  // Last 6 drawn (newest first, excluding very latest which is shown big)
-  const recentHistory = [...draws].reverse().slice(1, 7);
+  // Last 8 drawn (newest first, excluding very latest which is shown big)
+  const recentHistory = [...draws].reverse().slice(1, 9);
 
   return (
     <div
-      className="flex min-h-screen flex-col select-none overflow-hidden"
       style={{
+        display: "grid",
+        gridTemplateRows: "auto 1fr",
+        width: "100vw",
+        height: "100vh",
+        overflow: "hidden",
         background:
           "radial-gradient(ellipse 90% 50% at 50% -10%, hsl(263 40% 10% / 0.7), transparent 60%), " +
           "linear-gradient(to bottom, #09090b, #0f0f14)",
-        minHeight: "100vh",
+        userSelect: "none",
       }}
     >
-      {/* ── Top strip: BINGO header + stats ─────────────────────────────── */}
-      <header className="flex items-center justify-between px-6 pt-4 pb-2">
-        <div className="flex items-end gap-1 leading-none">
+
+      {/* ── Top bar: BINGO wordmark + stats ─────────────────────────────── */}
+      <header
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "clamp(6px,1.2vh,18px) clamp(10px,1.8vw,32px)",
+          borderBottom: "1px solid rgba(255,255,255,0.07)",
+          flexShrink: 0,
+          gap: "1vw",
+        }}
+      >
+        {/* BINGO wordmark */}
+        <div style={{ display: "flex", alignItems: "flex-end", gap: "clamp(2px,0.4vw,8px)", lineHeight: 1 }}>
           {(["B","I","N","G","O"] as const).map((l) => (
             <span
               key={l}
-              className="text-3xl font-black sm:text-4xl"
-              style={{ color: LETTER_COLOR[l].text, textShadow: LETTER_COLOR[l].glow }}
+              style={{
+                fontSize: "clamp(1.6rem, 4vw, 3.8rem)",
+                fontWeight: 900,
+                color: LETTER_COLOR[l].text,
+                textShadow: LETTER_COLOR[l].glow,
+                letterSpacing: "-0.02em",
+              }}
             >
               {l}
             </span>
           ))}
         </div>
-        <div className="flex gap-6 text-right">
-          <div>
-            <div className="text-2xl font-black text-white">{draws.length}</div>
-            <div className="text-xs font-medium uppercase tracking-widest text-white/40">Called</div>
-          </div>
-          <div>
-            <div className="text-2xl font-black text-white">{remaining}</div>
-            <div className="text-xs font-medium uppercase tracking-widest text-white/40">Left</div>
-          </div>
-          <div>
-            <div className="text-2xl font-black text-white">
-              {Math.round((draws.length / totalBalls) * 100)}%
+
+        {/* Stats strip */}
+        <div style={{ display: "flex", gap: "clamp(12px,2.5vw,48px)", alignItems: "center" }}>
+          {[
+            { label: "Called",    value: draws.length },
+            { label: "Remaining", value: remaining },
+            { label: "Complete",  value: `${Math.round((draws.length / totalBalls) * 100)}%` },
+          ].map(({ label, value }) => (
+            <div key={label} style={{ textAlign: "center" }}>
+              <div
+                style={{
+                  fontSize: "clamp(1.2rem, 2.8vw, 2.6rem)",
+                  fontWeight: 900,
+                  color: "#fff",
+                  lineHeight: 1,
+                }}
+              >
+                {value}
+              </div>
+              <div
+                style={{
+                  fontSize: "clamp(0.5rem, 0.9vw, 0.75rem)",
+                  fontWeight: 600,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.12em",
+                  color: "rgba(255,255,255,0.35)",
+                  marginTop: "2px",
+                }}
+              >
+                {label}
+              </div>
             </div>
-            <div className="text-xs font-medium uppercase tracking-widest text-white/40">Done</div>
-          </div>
+          ))}
         </div>
       </header>
 
-      {/* ── Main body ────────────────────────────────────────────────────── */}
-      <main className="flex flex-1 overflow-hidden">
+      {/* ── Main body: current ball panel + board ───────────────────────── */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "clamp(180px, 22vw, 320px) 1fr",
+          overflow: "hidden",
+          minHeight: 0,
+        }}
+      >
 
-        {/* ── Left: current ball + history ──────────────────────────────── */}
+        {/* ── Left panel: current ball + history ──────────────────────── */}
         <aside
-          className="flex flex-col items-center justify-center gap-5 px-4 py-4"
-          style={{ minWidth: "220px", maxWidth: "300px", flex: "0 0 260px" }}
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "clamp(8px, 1.5vh, 24px)",
+            padding: "clamp(8px,1.5vh,20px) clamp(6px,1vw,16px)",
+            borderRight: "1px solid rgba(255,255,255,0.07)",
+            overflow: "hidden",
+          }}
         >
           {/* Current ball bubble */}
           {latest ? (
             <div
               key={`ball-${latest.id}-${animNonce}`}
-              className="ball-pop flex flex-col items-center justify-center rounded-full"
+              className="ball-pop"
               style={{
-                width: "clamp(160px, 18vw, 220px)",
-                height: "clamp(160px, 18vw, 220px)",
-                border: `3px solid ${letterCols?.border ?? "rgba(255,255,255,0.2)"}`,
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                borderRadius: "50%",
+                width: "clamp(120px, 16vw, 240px)",
+                height: "clamp(120px, 16vw, 240px)",
+                border: `clamp(2px,0.3vw,5px) solid ${letterCols?.border ?? "rgba(255,255,255,0.2)"}`,
                 boxShadow: letterCols?.glow
                   ? `${letterCols.glow}, 0 0 60px ${letterCols.border}`
                   : "none",
                 background: letterCols?.bg ?? "rgba(255,255,255,0.06)",
+                flexShrink: 0,
               }}
             >
               {letter ? (
                 <span
-                  className="ball-letter text-2xl font-black sm:text-3xl"
-                  style={{ color: letterCols?.text ?? "#fff", lineHeight: 1 }}
+                  className="ball-letter"
+                  style={{
+                    fontSize: "clamp(1rem, 2.2vw, 2.2rem)",
+                    fontWeight: 900,
+                    color: letterCols?.text ?? "#fff",
+                    lineHeight: 1,
+                  }}
                 >
                   {letter}
                 </span>
               ) : null}
               <span
-                className="font-black tabular-nums leading-none"
                 style={{
-                  fontSize: "clamp(3rem, 7vw, 5.5rem)",
+                  fontSize: "clamp(2.4rem, 6vw, 6rem)",
+                  fontWeight: 900,
                   color: letterCols?.text ?? "#fff",
+                  lineHeight: 1,
+                  fontVariantNumeric: "tabular-nums",
                 }}
               >
                 {latest.number}
               </span>
-              <span
-                className="mt-1 text-xs font-semibold uppercase tracking-widest"
-                style={{ color: letterCols?.text ?? "#999", opacity: 0.7 }}
-              >
-                {presetLabel(preset)}
-              </span>
             </div>
           ) : (
             <div
-              className="flex flex-col items-center justify-center rounded-full"
               style={{
-                width: "clamp(160px, 18vw, 220px)",
-                height: "clamp(160px, 18vw, 220px)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                borderRadius: "50%",
+                width: "clamp(120px, 16vw, 240px)",
+                height: "clamp(120px, 16vw, 240px)",
                 border: "2px solid rgba(255,255,255,0.1)",
                 background: "rgba(255,255,255,0.03)",
+                flexShrink: 0,
               }}
             >
-              <span className="text-lg font-semibold text-white/30">Waiting…</span>
+              <span
+                style={{
+                  fontSize: "clamp(0.8rem, 1.4vw, 1.2rem)",
+                  fontWeight: 600,
+                  color: "rgba(255,255,255,0.3)",
+                }}
+              >
+                Waiting…
+              </span>
             </div>
           )}
 
-          {/* Draw order label */}
+          {/* Ball # label */}
           {latest ? (
-            <p className="text-center text-xs font-medium text-white/30 tracking-wider uppercase">
-              Ball #{latest.draw_order}
+            <p
+              style={{
+                fontSize: "clamp(0.55rem, 0.9vw, 0.8rem)",
+                fontWeight: 600,
+                textTransform: "uppercase",
+                letterSpacing: "0.15em",
+                color: "rgba(255,255,255,0.28)",
+                margin: 0,
+              }}
+            >
+              Ball #{latest.draw_order} · {presetLabel(preset)}
             </p>
           ) : null}
 
           {/* Recent history chips */}
           {recentHistory.length > 0 ? (
-            <div className="w-full">
-              <p className="mb-2 text-center text-xs font-medium uppercase tracking-widest text-white/25">
+            <div style={{ width: "100%" }}>
+              <p
+                style={{
+                  fontSize: "clamp(0.5rem, 0.8vw, 0.65rem)",
+                  fontWeight: 600,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.15em",
+                  color: "rgba(255,255,255,0.22)",
+                  textAlign: "center",
+                  marginBottom: "clamp(4px,0.8vh,10px)",
+                }}
+              >
                 Previous
               </p>
-              <div className="flex flex-wrap justify-center gap-1.5">
+              <div
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  justifyContent: "center",
+                  gap: "clamp(3px,0.5vw,7px)",
+                }}
+              >
                 {recentHistory.map((d, i) => {
                   const l = letterForNumber(preset, d.number);
                   const c = LETTER_COLOR[l ?? ""] ?? null;
                   return (
                     <span
                       key={d.id}
-                      className="inline-flex items-center justify-center rounded-full text-xs font-bold tabular-nums"
                       style={{
-                        width: "34px", height: "34px",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        borderRadius: "50%",
+                        width: "clamp(28px, 3.2vw, 48px)",
+                        height: "clamp(28px, 3.2vw, 48px)",
+                        fontSize: "clamp(0.6rem, 1.1vw, 0.95rem)",
+                        fontWeight: 700,
+                        fontVariantNumeric: "tabular-nums",
                         border: `1.5px solid ${c?.border ?? "rgba(255,255,255,0.2)"}`,
                         color: c?.text ?? "#fff",
                         background: c?.bg ?? "rgba(255,255,255,0.05)",
-                        opacity: 1 - i * 0.14,
+                        opacity: 1 - i * 0.11,
                       }}
                     >
                       {d.number}
@@ -202,31 +292,55 @@ export function BingoStage({
         </aside>
 
         {/* ── Right: full BINGO board ──────────────────────────────────── */}
-        <div className="flex flex-1 items-center justify-center overflow-auto px-3 py-4">
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "clamp(6px,1vh,16px) clamp(8px,1.2vw,20px)",
+            overflow: "hidden",
+            minWidth: 0,
+            minHeight: 0,
+          }}
+        >
           {preset === "US-75" ? (
-            /* US-75: 5 columns × 15 rows grid */
+            /* US-75: 5 columns (B/I/N/G/O) × 15 rows — fills the landscape panel */
             <div
-              className="grid w-full"
               style={{
+                display: "grid",
                 gridTemplateColumns: "repeat(5, 1fr)",
-                gap: "clamp(3px, 0.6vw, 8px)",
-                maxWidth: "900px",
+                gap: "clamp(3px, 0.5vw, 8px)",
+                width: "100%",
+                height: "100%",
+                maxWidth: "min(100%, calc(100vh * 1.4))",
               }}
             >
               {US75_COLS.map(({ letter: col, start }) => {
                 const c = LETTER_COLOR[col];
                 return (
-                  <div key={col} className="flex flex-col" style={{ gap: "clamp(3px, 0.6vw, 8px)" }}>
+                  <div
+                    key={col}
+                    style={{
+                      display: "grid",
+                      gridTemplateRows: "auto repeat(15, 1fr)",
+                      gap: "clamp(3px, 0.5vw, 8px)",
+                      minHeight: 0,
+                    }}
+                  >
                     {/* Column header */}
                     <div
-                      className="flex items-center justify-center rounded-lg font-black"
                       style={{
-                        fontSize: "clamp(1rem, 2.2vw, 1.75rem)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: "clamp(1rem, 2vw, 2rem)",
+                        fontWeight: 900,
                         color: c.text,
                         textShadow: c.glow,
-                        paddingBlock: "clamp(4px, 1vh, 10px)",
                         background: c.bg,
                         border: `1.5px solid ${c.border}`,
+                        borderRadius: "clamp(4px, 0.6vw, 10px)",
+                        paddingBlock: "clamp(3px, 0.6vh, 10px)",
                       }}
                     >
                       {col}
@@ -234,7 +348,7 @@ export function BingoStage({
 
                     {/* 15 number cells */}
                     {Array.from({ length: 15 }, (_, i) => {
-                      const n    = start + i;
+                      const n        = start + i;
                       const isLatest = latest?.number === n;
                       const isCalled = calledSet.has(n);
                       return (
@@ -245,11 +359,10 @@ export function BingoStage({
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "center",
-                            borderRadius: "clamp(4px, 0.8vw, 10px)",
-                            fontSize: "clamp(0.65rem, 1.4vw, 1.05rem)",
+                            borderRadius: "clamp(3px, 0.5vw, 8px)",
+                            fontSize: "clamp(0.6rem, 1.2vw, 1.1rem)",
                             fontWeight: 700,
                             fontVariantNumeric: "tabular-nums",
-                            aspectRatio: "1",
                             border: isLatest
                               ? `2px solid ${c.border}`
                               : isCalled
@@ -258,29 +371,29 @@ export function BingoStage({
                             background: isLatest
                               ? c.bg
                               : isCalled
-                                ? `${c.bg}`
+                                ? c.bg
                                 : "rgba(255,255,255,0.03)",
                             color: isCalled ? c.text : "rgba(255,255,255,0.18)",
                             boxShadow: isLatest ? c.glow : "none",
-                            transform: isLatest ? "scale(1.1)" : "scale(1)",
-                            zIndex: isLatest ? 1 : "auto",
-                            position: "relative",
+                            transform: isLatest ? "scale(1.08)" : "scale(1)",
                             transition: "background 0.3s, color 0.3s, box-shadow 0.3s, transform 0.3s",
+                            position: "relative",
+                            minHeight: 0,
+                            minWidth: 0,
                           }}
                         >
                           {n}
-                          {/* Dot indicator for called */}
                           {isCalled && !isLatest ? (
                             <span
                               style={{
                                 position: "absolute",
-                                bottom: "clamp(2px,0.5vw,5px)",
-                                right: "clamp(2px,0.5vw,5px)",
-                                width: "clamp(3px,0.5vw,5px)",
-                                height: "clamp(3px,0.5vw,5px)",
+                                bottom: "clamp(2px,0.4vw,4px)",
+                                right: "clamp(2px,0.4vw,4px)",
+                                width: "clamp(3px,0.4vw,5px)",
+                                height: "clamp(3px,0.4vw,5px)",
                                 borderRadius: "50%",
                                 background: c.text,
-                                opacity: 0.6,
+                                opacity: 0.55,
                               }}
                             />
                           ) : null}
@@ -292,39 +405,50 @@ export function BingoStage({
               })}
             </div>
           ) : (
-            /* UK-90: 9×10 grid, no letter columns */
+            /* UK-90: 10 columns × 9 rows + header row */
             <div
               style={{
                 display: "grid",
                 gridTemplateColumns: "repeat(10, 1fr)",
-                gap: "clamp(3px, 0.5vw, 7px)",
-                maxWidth: "860px",
+                gridTemplateRows: "auto repeat(9, 1fr)",
+                gap: "clamp(3px, 0.45vw, 7px)",
                 width: "100%",
+                height: "100%",
+                maxWidth: "min(100%, calc(100vh * 1.8))",
               }}
             >
-              {/* Header: 1–10 labels */}
-              {Array.from({ length: 10 }, (_, i) => (
-                <div
-                  key={`h-${i}`}
-                  className="flex items-center justify-center font-bold"
-                  style={{
-                    fontSize: "clamp(0.6rem, 1.2vw, 0.85rem)",
-                    color: "rgba(255,255,255,0.3)",
-                    paddingBlock: "clamp(2px, 0.5vh, 6px)",
-                  }}
-                >
-                  {i * 10 + 1}–{(i + 1) * 10}
-                </div>
-              ))}
-              {/* Numbers 1-90 */}
+              {/* Decade header row */}
+              {Array.from({ length: 10 }, (_, i) => {
+                const cols = [LETTER_COLOR.B, LETTER_COLOR.I, LETTER_COLOR.N, LETTER_COLOR.G, LETTER_COLOR.O];
+                const c = cols[i % 5];
+                return (
+                  <div
+                    key={`h-${i}`}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: "clamp(0.5rem, 0.9vw, 0.8rem)",
+                      fontWeight: 700,
+                      color: c.text,
+                      background: c.bg,
+                      border: `1px solid ${c.border}`,
+                      borderRadius: "clamp(3px, 0.5vw, 8px)",
+                      paddingBlock: "clamp(2px, 0.5vh, 6px)",
+                    }}
+                  >
+                    {i === 9 ? "81–90" : `${i * 10 + 1}–${(i + 1) * 10}`}
+                  </div>
+                );
+              })}
+              {/* Numbers 1-90, row-major */}
               {Array.from({ length: 90 }, (_, i) => {
-                const n = i + 1;
+                const n        = i + 1;
+                const col      = (i % 10);
                 const isLatest = latest?.number === n;
                 const isCalled = calledSet.has(n);
-                // Colour based on decade
-                const decade = Math.floor((n - 1) / 10) % 5;
-                const cols = [LETTER_COLOR.B, LETTER_COLOR.I, LETTER_COLOR.N, LETTER_COLOR.G, LETTER_COLOR.O];
-                const c = cols[decade];
+                const cols     = [LETTER_COLOR.B, LETTER_COLOR.I, LETTER_COLOR.N, LETTER_COLOR.G, LETTER_COLOR.O];
+                const c        = cols[col % 5];
                 return (
                   <div
                     key={n}
@@ -332,11 +456,10 @@ export function BingoStage({
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
-                      borderRadius: "clamp(3px, 0.6vw, 8px)",
-                      fontSize: "clamp(0.6rem, 1.2vw, 0.9rem)",
+                      borderRadius: "clamp(3px, 0.5vw, 8px)",
+                      fontSize: "clamp(0.55rem, 1.1vw, 0.95rem)",
                       fontWeight: 700,
                       fontVariantNumeric: "tabular-nums",
-                      aspectRatio: "1",
                       border: isLatest
                         ? `2px solid ${c.border}`
                         : isCalled
@@ -345,9 +468,11 @@ export function BingoStage({
                       background: isCalled ? c.bg : "rgba(255,255,255,0.03)",
                       color: isCalled ? c.text : "rgba(255,255,255,0.18)",
                       boxShadow: isLatest ? c.glow : "none",
-                      transform: isLatest ? "scale(1.12)" : "scale(1)",
-                      position: "relative",
+                      transform: isLatest ? "scale(1.1)" : "scale(1)",
                       transition: "background 0.3s, color 0.3s, box-shadow 0.3s, transform 0.3s",
+                      position: "relative",
+                      minHeight: 0,
+                      minWidth: 0,
                     }}
                   >
                     {n}
@@ -357,21 +482,30 @@ export function BingoStage({
             </div>
           )}
         </div>
-      </main>
+      </div>
 
       {/* ── Waiting state overlay ─────────────────────────────────────────── */}
       {draws.length === 0 ? (
         <div
-          className="absolute inset-0 flex flex-col items-center justify-center gap-4"
-          style={{ background: "rgba(9,9,11,0.85)", backdropFilter: "blur(4px)" }}
+          style={{
+            position: "absolute",
+            inset: 0,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "clamp(12px, 2.5vh, 36px)",
+            background: "rgba(9,9,11,0.88)",
+            backdropFilter: "blur(6px)",
+          }}
         >
-          <div className="flex gap-2">
+          <div style={{ display: "flex", gap: "clamp(8px, 1.5vw, 24px)" }}>
             {(["B","I","N","G","O"] as const).map((l, i) => (
               <span
                 key={l}
-                className="font-black"
                 style={{
-                  fontSize: "clamp(3rem, 8vw, 6rem)",
+                  fontSize: "clamp(3rem, 10vw, 9rem)",
+                  fontWeight: 900,
                   color: LETTER_COLOR[l].text,
                   textShadow: LETTER_COLOR[l].glow,
                   animation: `bingo-pulse 2s ease-in-out ${i * 0.18}s infinite`,
@@ -381,7 +515,15 @@ export function BingoStage({
               </span>
             ))}
           </div>
-          <p className="text-sm font-medium uppercase tracking-[0.3em] text-white/40">
+          <p
+            style={{
+              fontSize: "clamp(0.75rem, 1.4vw, 1.1rem)",
+              fontWeight: 500,
+              textTransform: "uppercase",
+              letterSpacing: "0.3em",
+              color: "rgba(255,255,255,0.35)",
+            }}
+          >
             Waiting for the first ball…
           </p>
         </div>
