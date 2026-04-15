@@ -1,3 +1,4 @@
+import { unstable_noStore as noStore } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { letterForNumber, presetLabel, type BallPreset } from "@/lib/bingo";
 import { HostControlPanel } from "@/components/host/HostControlPanel";
@@ -7,6 +8,7 @@ import { headers } from "next/headers";
 export const dynamic = "force-dynamic";
 
 export default async function HostControlPage() {
+  noStore();
   const supabase = await createClient();
   const {
     data: { user },

@@ -266,8 +266,36 @@ export function DisplayClient({
 
   return (
     <div className="relative min-h-screen overflow-hidden">
-      {/* Live status — top right (small) */}
-      <div className="pointer-events-none absolute right-3 top-3 z-20">
+      <BingoStage
+        preset={data.ball_preset}
+        draws={data.draws}
+        latest={data.latest}
+        animNonce={animNonce}
+        bottomLeftSlot={
+          <div className="flex flex-col gap-2">
+            {!unlocked ? (
+              <button
+                type="button"
+                onClick={() => void unlockFromGesture()}
+                className="rounded-lg border border-white/20 bg-black/70 px-3 py-2 text-xs font-medium text-white/90 shadow-lg backdrop-blur transition hover:bg-black/85"
+              >
+                🔊 Enable sound
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={toggleSound}
+                className="rounded-lg border border-white/20 bg-black/70 px-3 py-2 text-xs font-medium text-white/90 shadow-lg backdrop-blur transition hover:bg-black/85"
+              >
+                {soundOn ? "🔊" : "🔇"} Sound {soundOn ? "on" : "off"}
+              </button>
+            )}
+          </div>
+        }
+      />
+
+      {/* Live status — above full-screen board */}
+      <div className="pointer-events-none fixed right-3 top-3 z-[110]">
         <span
           title={
             realtimeOk === true
@@ -288,34 +316,6 @@ export function DisplayClient({
           }}
         />
       </div>
-
-      {/* Sound — bottom left (TV-safe, easy to reach) */}
-      <div className="pointer-events-auto fixed bottom-4 left-4 z-20 flex flex-col gap-2 sm:bottom-6 sm:left-6">
-        {!unlocked ? (
-          <button
-            type="button"
-            onClick={() => void unlockFromGesture()}
-            className="rounded-lg border border-white/20 bg-black/70 px-3 py-2 text-xs font-medium text-white/90 shadow-lg backdrop-blur transition hover:bg-black/85"
-          >
-            🔊 Enable sound
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={toggleSound}
-            className="rounded-lg border border-white/20 bg-black/70 px-3 py-2 text-xs font-medium text-white/90 shadow-lg backdrop-blur transition hover:bg-black/85"
-          >
-            {soundOn ? "🔊" : "🔇"} Sound {soundOn ? "on" : "off"}
-          </button>
-        )}
-      </div>
-
-      <BingoStage
-        preset={data.ball_preset}
-        draws={data.draws}
-        latest={data.latest}
-        animNonce={animNonce}
-      />
     </div>
   );
 }

@@ -50,10 +50,19 @@ export function DisplayConnectPanel({
     <section className="space-y-3 rounded-lg border border-border bg-card/30 p-4">
       <div className="flex flex-wrap items-center gap-2">
         <h2 className="text-sm font-medium text-foreground">TV display</h2>
-        <span className={`rounded px-2 py-0.5 text-xs ${
-          connected ? "bg-emerald-950/50 text-emerald-300" : "bg-amber-950/50 text-amber-300"
-        }`}>
-          {connected ? "Connected" : "Not confirmed"}
+        <span
+          className={`rounded px-2 py-0.5 text-xs ${
+            connected
+              ? "bg-emerald-950/50 text-emerald-300"
+              : "bg-muted/40 text-muted-foreground"
+          }`}
+          title={
+            connected
+              ? "You confirmed on this device that the board is visible."
+              : "Optional: confirm in the dialog after the TV shows the board. The TV still works without this."
+          }
+        >
+          {connected ? "Confirmed on this device" : "Not marked here (TV can still work)"}
         </span>
       </div>
 

@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { letterForNumber, presetLabel, type BallPreset } from "@/lib/bingo";
 
 type Draw = {
@@ -30,11 +31,14 @@ export function BingoStage({
   draws,
   latest,
   animNonce,
+  bottomLeftSlot = null,
 }: {
   preset: BallPreset;
   draws: Draw[];
   latest: Draw | null;
   animNonce: number;
+  /** TV-safe controls (e.g. sound) — rendered above the full-screen grid */
+  bottomLeftSlot?: ReactNode;
 }) {
   const calledSet  = new Set(draws.map((d) => d.number));
   const letter     = latest ? letterForNumber(preset, latest.number) : null;
@@ -48,6 +52,7 @@ export function BingoStage({
   return (
     <div
       style={{
+        position: "relative",
         display: "grid",
         gridTemplateRows: "auto 1fr",
         width: "100vw",
@@ -526,6 +531,20 @@ export function BingoStage({
           >
             Waiting for the first ball…
           </p>
+        </div>
+      ) : null}
+
+      {bottomLeftSlot ? (
+        <div
+          style={{
+            position: "absolute",
+            left: "clamp(12px, 2vw, 28px)",
+            bottom: "clamp(12px, 2vh, 28px)",
+            zIndex: 100,
+            pointerEvents: "auto",
+          }}
+        >
+          {bottomLeftSlot}
         </div>
       ) : null}
     </div>

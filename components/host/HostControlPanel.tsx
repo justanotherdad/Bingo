@@ -56,10 +56,16 @@ export function HostControlPanel({
   const wakeRef = useRef<WakeLockSentinel | null>(null);
   const wakeOnRef = useRef(false);
   const [wakeMsg, setWakeMsg] = useState<string | null>(null);
+  const [wakeAckAt, setWakeAckAt] = useState<number | null>(null);
 
   useEffect(() => {
     wakeOnRef.current = wakeOn;
   }, [wakeOn]);
+
+  // Re-sync when returning from other host routes (Overview) so last draw isn’t stale
+  useEffect(() => {
+    setLastDraw(initialLastDraw);
+  }, [initialLastDraw?.number, initialLastDraw?.order]);
 
   async function requestWakeLock() {
     try {
@@ -70,6 +76,8 @@ export function HostControlPanel({
       wakeRef.current = await navigator.wakeLock.request("screen");
       setWakeOn(true);
       setWakeMsg(null);
+      setWakeAckAt(Date.now());
+      window.setTimeout(() => setWakeAckAt(null), 3200);
       wakeRef.current.addEventListener("release", () => setWakeOn(false));
     } catch (e) {
       setWakeMsg(e instanceof Error ? e.message : "Could not enable keep-awake.");
@@ -343,18 +351,19 @@ export function HostControlPanel({
         <button
           type="button"
           disabled={busy}
+          aria-pressed={wakeOn}
           onClick={() => {
             setError(null);
             setWakeMsg(null);
             wakeOn ? void releaseWakeLock() : void requestWakeLock();
           }}
-          className={`rounded-xl border py-3 text-xs font-semibold transition disabled:opacity-40 ${
+          className={`rounded-xl border py-3 text-xs font-semibold transition active:scale-[0.97] disabled:opacity-40 ${
             wakeOn
-              ? "border-green-700/60 bg-green-950/30 text-green-200 hover:bg-green-950/50"
+              ? "border-green-500/70 bg-green-950/40 text-green-100 shadow-[0_0_0_2px_rgba(34,197,94,0.35)] ring-2 ring-green-500/30 hover:bg-green-950/55"
               : "border-border bg-card/50 text-muted hover:border-accent/40 hover:text-foreground"
           }`}
         >
-          {wakeOn ? "🔆 Screen awake: ON" : "🔅 Keep screen awake"}
+          {wakeOn ? "🔆 Screen awake — ON" : "🔅 Keep screen awake"}
         </button>
 
         <div className="rounded-xl border border-border bg-card/30 px-4 py-3">
@@ -377,6 +386,12 @@ export function HostControlPanel({
           </div>
         </div>
       </div>
+
+      {wakeAckAt ? (
+        <p className="text-center text-xs font-medium text-green-300/95">
+          Keep-awake enabled — screen should stay on while this tab is visible.
+        </p>
+      ) : null}
 
       {wakeMsg ? (
         <p className="text-center text-xs text-amber-200/90">{wakeMsg}</p>
