@@ -309,15 +309,16 @@ export function BingoStage({
           }}
         >
           {preset === "US-75" ? (
-            /* US-75: 5 columns (B/I/N/G/O) × 15 rows — fills the landscape panel */
+            /* US-75: 5 horizontal rows — letter (B→O) on the left top-to-bottom; numbers extend right */
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(5, 1fr)",
+                gridTemplateRows: "repeat(5, minmax(0, 1fr))",
                 gap: "clamp(3px, 0.5vw, 8px)",
                 width: "100%",
                 height: "100%",
                 maxWidth: "min(100%, calc(100vh * 1.4))",
+                minHeight: 0,
               }}
             >
               {US75_COLS.map(({ letter: col, start }) => {
@@ -327,31 +328,34 @@ export function BingoStage({
                     key={col}
                     style={{
                       display: "grid",
-                      gridTemplateRows: "auto repeat(15, 1fr)",
+                      gridTemplateColumns:
+                        "clamp(2rem, 4vw, 3.25rem) repeat(15, minmax(0, 1fr))",
                       gap: "clamp(3px, 0.5vw, 8px)",
+                      alignItems: "stretch",
                       minHeight: 0,
+                      minWidth: 0,
                     }}
                   >
-                    {/* Column header */}
+                    {/* Row letter — left strip */}
                     <div
                       style={{
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
-                        fontSize: "clamp(1rem, 2vw, 2rem)",
+                        fontSize: "clamp(1rem, 2.2vw, 2rem)",
                         fontWeight: 900,
                         color: c.text,
                         textShadow: c.glow,
                         background: c.bg,
                         border: `1.5px solid ${c.border}`,
                         borderRadius: "clamp(4px, 0.6vw, 10px)",
-                        paddingBlock: "clamp(3px, 0.6vh, 10px)",
+                        minWidth: 0,
                       }}
                     >
                       {col}
                     </div>
 
-                    {/* 15 number cells */}
+                    {/* 15 number cells in a row */}
                     {Array.from({ length: 15 }, (_, i) => {
                       const n        = start + i;
                       const isLatest = latest?.number === n;
