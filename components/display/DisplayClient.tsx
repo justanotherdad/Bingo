@@ -8,6 +8,7 @@ import {
   resumeAudioContext,
 } from "@/lib/audio/drawChime";
 import { letterForNumber, type BallPreset } from "@/lib/bingo";
+import { parseWinPattern } from "@/lib/bingo/winPattern";
 import { BingoStage } from "@/components/display/BingoStage";
 
 type DrawPayload = {
@@ -19,6 +20,7 @@ type DrawPayload = {
 
 type ApiResponse = {
   ball_preset: BallPreset;
+  win_pattern?: string;
   status: string;
   draws: DrawPayload[];
   latest: DrawPayload | null;
@@ -268,6 +270,7 @@ export function DisplayClient({
     <div className="relative min-h-screen overflow-hidden">
       <BingoStage
         preset={data.ball_preset}
+        winPattern={parseWinPattern(data.win_pattern)}
         draws={data.draws}
         latest={data.latest}
         animNonce={animNonce}

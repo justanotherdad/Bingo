@@ -1,5 +1,8 @@
 import type { ReactNode } from "react";
 import { letterForNumber, presetLabel, type BallPreset } from "@/lib/bingo";
+import type { WinPattern } from "@/lib/bingo/winPattern";
+import { WIN_PATTERN_OPTIONS } from "@/lib/bingo/winPattern";
+import { WinPatternGlyph } from "@/components/display/WinPatternGlyph";
 
 type Draw = {
   id: string;
@@ -28,12 +31,15 @@ const US75_COLS: { letter: "B" | "I" | "N" | "G" | "O"; start: number }[] = [
 // ─── Component ─────────────────────────────────────────────────────────────
 export function BingoStage({
   preset,
+  winPattern = "straight_line",
   draws,
   latest,
   animNonce,
   bottomLeftSlot = null,
 }: {
   preset: BallPreset;
+  /** Room win style (shown on TV for players’ paper cards). */
+  winPattern?: WinPattern;
   draws: Draw[];
   latest: Draw | null;
   animNonce: number;
@@ -48,6 +54,8 @@ export function BingoStage({
 
   // Last 8 drawn (newest first, excluding very latest which is shown big)
   const recentHistory = [...draws].reverse().slice(1, 9);
+  const winPatternLabel =
+    WIN_PATTERN_OPTIONS.find((o) => o.value === winPattern)?.label ?? "Straight line";
 
   return (
     <div
@@ -95,38 +103,83 @@ export function BingoStage({
           ))}
         </div>
 
-        {/* Stats strip */}
-        <div style={{ display: "flex", gap: "clamp(12px,2.5vw,48px)", alignItems: "center" }}>
-          {[
-            { label: "Called",    value: draws.length },
-            { label: "Remaining", value: remaining },
-            { label: "Complete",  value: `${Math.round((draws.length / totalBalls) * 100)}%` },
-          ].map(({ label, value }) => (
-            <div key={label} style={{ textAlign: "center" }}>
-              <div
-                style={{
-                  fontSize: "clamp(1.2rem, 2.8vw, 2.6rem)",
-                  fontWeight: 900,
-                  color: "#fff",
-                  lineHeight: 1,
-                }}
-              >
-                {value}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "clamp(10px, 2vw, 28px)",
+            marginLeft: "auto",
+          }}
+        >
+          {/* Stats strip */}
+          <div style={{ display: "flex", gap: "clamp(12px,2.5vw,48px)", alignItems: "center" }}>
+            {[
+              { label: "Called",    value: draws.length },
+              { label: "Remaining", value: remaining },
+              { label: "Complete",  value: `${Math.round((draws.length / totalBalls) * 100)}%` },
+            ].map(({ label, value }) => (
+              <div key={label} style={{ textAlign: "center" }}>
+                <div
+                  style={{
+                    fontSize: "clamp(1.2rem, 2.8vw, 2.6rem)",
+                    fontWeight: 900,
+                    color: "#fff",
+                    lineHeight: 1,
+                  }}
+                >
+                  {value}
+                </div>
+                <div
+                  style={{
+                    fontSize: "clamp(0.5rem, 0.9vw, 0.75rem)",
+                    fontWeight: 600,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.12em",
+                    color: "rgba(255,255,255,0.35)",
+                    marginTop: "2px",
+                  }}
+                >
+                  {label}
+                </div>
               </div>
+            ))}
+          </div>
+
+          {/* Win pattern (5×5 glyph + label) */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "clamp(6px, 1vw, 12px)",
+              flexShrink: 0,
+            }}
+            title={WIN_PATTERN_OPTIONS.find((o) => o.value === winPattern)?.description}
+          >
+            <div style={{ textAlign: "right", lineHeight: 1.2 }}>
               <div
                 style={{
-                  fontSize: "clamp(0.5rem, 0.9vw, 0.75rem)",
+                  fontSize: "clamp(0.45rem, 0.65vw, 0.65rem)",
                   fontWeight: 600,
                   textTransform: "uppercase",
-                  letterSpacing: "0.12em",
+                  letterSpacing: "0.14em",
                   color: "rgba(255,255,255,0.35)",
-                  marginTop: "2px",
                 }}
               >
-                {label}
+                Win pattern
+              </div>
+              <div
+                style={{
+                  fontSize: "clamp(0.55rem, 0.85vw, 0.8rem)",
+                  fontWeight: 700,
+                  color: "rgba(255,255,255,0.88)",
+                  maxWidth: "clamp(72px, 12vw, 140px)",
+                }}
+              >
+                {winPatternLabel}
               </div>
             </div>
-          ))}
+            <WinPatternGlyph pattern={winPattern} size={48} title={winPatternLabel} />
+          </div>
         </div>
       </header>
 

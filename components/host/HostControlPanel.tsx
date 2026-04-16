@@ -6,8 +6,11 @@ import {
   clearBoardAndNewGame,
   drawNextNumber,
   endHostSession,
+  updateWinPattern,
 } from "@/app/host/actions";
 import { letterForNumber } from "@/lib/bingo";
+import type { WinPattern } from "@/lib/bingo/winPattern";
+import { WIN_PATTERN_OPTIONS } from "@/lib/bingo/winPattern";
 import { playDrawChime, resumeAudioContext } from "@/lib/audio/drawChime";
 import type { BallPreset } from "@/lib/bingo";
 
@@ -29,13 +32,16 @@ const LETTER_COLOR: Record<string, string> = {
 // ─── Component ────────────────────────────────────────────────────────────────
 export function HostControlPanel({
   initialPreset,
+  initialWinPattern,
   initialLastDraw = null,
 }: {
   initialPreset: BallPreset;
+  initialWinPattern: WinPattern;
   initialLastDraw?: LastDraw;
 }) {
   const router = useRouter();
   const [preset, setPreset]       = useState<BallPreset>(initialPreset);
+  const [winPattern, setWinPattern] = useState<WinPattern>(initialWinPattern);
   const [error, setError]         = useState<string | null>(null);
   const [lastDraw, setLastDraw]   = useState<LastDraw>(initialLastDraw);
   const [ending, setEnding]       = useState(false);
@@ -66,6 +72,10 @@ export function HostControlPanel({
   useEffect(() => {
     setLastDraw(initialLastDraw);
   }, [initialLastDraw?.number, initialLastDraw?.order]);
+
+  useEffect(() => {
+    setWinPattern(initialWinPattern);
+  }, [initialWinPattern]);
 
   async function requestWakeLock() {
     try {
@@ -196,7 +206,7 @@ export function HostControlPanel({
     setError(null);
     startTransition(async () => {
       try {
-        await clearBoardAndNewGame(preset);
+        await clearBoardAndNewGame(preset, winPattern);
         setLastDraw(null);
         router.refresh();
       } catch (e) {
@@ -259,6 +269,40 @@ export function HostControlPanel({
         ) : (
           <p className="text-sm text-muted">No balls drawn yet — tap Draw to begin.</p>
         )}
+      </div>
+
+      {/* ── Win pattern (TV + room info) ────────────────────────────────── */}
+      <div className="rounded-xl border border-border bg-card/40 p-4 space-y-2">
+        <p className="text-xs font-semibold uppercase tracking-widest text-muted">
+          Win pattern
+        </p>
+        <p className="text-xs text-muted">
+          What players need on their cards. Shown on the TV display.
+        </p>
+        <select
+          value={winPattern}
+          disabled={busy}
+          onChange={(e) => {
+            const next = e.target.value as WinPattern;
+            setWinPattern(next);
+            setError(null);
+            startTransition(async () => {
+              try {
+                await updateWinPattern(next);
+                router.refresh();
+              } catch (err) {
+                setError(err instanceof Error ? err.message : "Could not update pattern");
+              }
+            });
+          }}
+          className="w-full rounded-lg border border-border bg-card px-3 py-2.5 text-sm text-foreground"
+        >
+          {WIN_PATTERN_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label} — {o.description}
+            </option>
+          ))}
+        </select>
       </div>
 
       {/* ── Draw button ───────────────────────────────────────────────────── */}

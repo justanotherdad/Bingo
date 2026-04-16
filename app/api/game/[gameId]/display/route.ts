@@ -34,7 +34,7 @@ export async function GET(
 
   const { data: game, error: gErr } = await supabase
     .from("games")
-    .select("id, ball_preset, status, display_token")
+    .select("id, ball_preset, status, display_token, win_pattern")
     .eq("id", gameId)
     .maybeSingle();
 
@@ -61,6 +61,7 @@ export async function GET(
 
   return NextResponse.json({
     ball_preset: game.ball_preset,
+    win_pattern: game.win_pattern ?? "straight_line",
     status: game.status,
     draws: list,
     latest,

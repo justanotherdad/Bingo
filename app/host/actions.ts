@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { numberPool, type BallPreset } from "@/lib/bingo";
+import type { WinPattern } from "@/lib/bingo/winPattern";
 import { createClient } from "@/lib/supabase/server";
 
 async function requireUser() {
@@ -36,7 +37,10 @@ export async function ensureHostSession() {
   return { sessionId: data.id };
 }
 
-export async function createActiveGame(preset: BallPreset) {
+export async function createActiveGame(
+  preset: BallPreset,
+  winPattern: WinPattern = "straight_line"
+) {
   const { supabase, user } = await requireUser();
 
   const { data: active } = await supabase
@@ -58,6 +62,7 @@ export async function createActiveGame(preset: BallPreset) {
       user_id: user.id,
       host_session_id: sessionId,
       ball_preset: preset,
+      win_pattern: winPattern,
       status: "active",
     })
     .select("id, display_token, ball_preset")
@@ -112,7 +117,25 @@ export async function drawNextNumber() {
   return { number, draw_order };
 }
 
-export async function clearBoardAndNewGame(preset: BallPreset) {
+export async function updateWinPattern(winPattern: WinPattern) {
+  const { supabase, user } = await requireUser();
+
+  const { error } = await supabase
+    .from("games")
+    .update({ win_pattern: winPattern })
+    .eq("user_id", user.id)
+    .eq("status", "active");
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/host");
+  revalidatePath("/host/control");
+}
+
+export async function clearBoardAndNewGame(
+  preset: BallPreset,
+  winPattern: WinPattern = "straight_line"
+) {
   const { supabase, user } = await requireUser();
 
   const { data: game } = await supabase
@@ -139,6 +162,7 @@ export async function clearBoardAndNewGame(preset: BallPreset) {
       user_id: user.id,
       host_session_id: game.host_session_id,
       ball_preset: preset,
+      win_pattern: winPattern,
       status: "active",
     })
     .select("id, display_token, ball_preset")

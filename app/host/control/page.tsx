@@ -1,6 +1,7 @@
 import { unstable_noStore as noStore } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { letterForNumber, presetLabel, type BallPreset } from "@/lib/bingo";
+import { parseWinPattern } from "@/lib/bingo/winPattern";
 import { HostControlPanel } from "@/components/host/HostControlPanel";
 import Link from "next/link";
 import { headers } from "next/headers";
@@ -17,7 +18,7 @@ export default async function HostControlPage() {
 
   const { data: game } = await supabase
     .from("games")
-    .select("id, ball_preset, display_token")
+    .select("id, ball_preset, display_token, win_pattern")
     .eq("user_id", user.id)
     .eq("status", "active")
     .maybeSingle();
@@ -50,6 +51,11 @@ export default async function HostControlPage() {
   }
 
   const preset = game.ball_preset as BallPreset;
+  const initialWinPattern = parseWinPattern(
+    typeof (game as { win_pattern?: string | null }).win_pattern === "string"
+      ? (game as { win_pattern: string }).win_pattern
+      : undefined
+  );
 
   const { data: lastDrawRow } = await supabase
     .from("draws")
@@ -94,6 +100,7 @@ export default async function HostControlPage() {
       <HostControlPanel
         key={game.id}
         initialPreset={preset}
+        initialWinPattern={initialWinPattern}
         initialLastDraw={initialLastDraw}
       />
     </div>
