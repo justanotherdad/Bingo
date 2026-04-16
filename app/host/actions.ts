@@ -132,6 +132,10 @@ export async function updateWinPattern(winPattern: WinPattern) {
   revalidatePath("/host/control");
 }
 
+/**
+ * Clear the board for another round **without** ending the game row.
+ * Keeps the same `game_id` and `display_token` so TV / cast URLs keep working.
+ */
 export async function clearBoardAndNewGame(
   preset: BallPreset,
   winPattern: WinPattern = "straight_line"
@@ -140,39 +144,37 @@ export async function clearBoardAndNewGame(
 
   const { data: game } = await supabase
     .from("games")
-    .select("id, host_session_id")
+    .select("id")
     .eq("user_id", user.id)
     .eq("status", "active")
     .maybeSingle();
 
   if (!game) throw new Error("No active game.");
 
-  const ended = new Date().toISOString();
+  const { error: delErr } = await supabase
+    .from("draws")
+    .delete()
+    .eq("game_id", game.id);
 
-  const { error: uErr } = await supabase
+  if (delErr) throw new Error(delErr.message);
+
+  const { data: updated, error: upErr } = await supabase
     .from("games")
-    .update({ status: "completed", ended_at: ended })
-    .eq("id", game.id);
-
-  if (uErr) throw new Error(uErr.message);
-
-  const { data: newGame, error: cErr } = await supabase
-    .from("games")
-    .insert({
-      user_id: user.id,
-      host_session_id: game.host_session_id,
+    .update({
       ball_preset: preset,
       win_pattern: winPattern,
-      status: "active",
+      last_activity_at: new Date().toISOString(),
     })
+    .eq("id", game.id)
+    .eq("user_id", user.id)
     .select("id, display_token, ball_preset")
     .single();
 
-  if (cErr) throw new Error(cErr.message);
+  if (upErr) throw new Error(upErr.message);
 
   revalidatePath("/host");
   revalidatePath("/host/control");
-  return newGame;
+  return updated;
 }
 
 export async function endHostSession() {
