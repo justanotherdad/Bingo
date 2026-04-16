@@ -138,6 +138,15 @@ Exact clicks vary by hPanel version; look for **Git**, **Deployments**, or **Con
 7. Save and trigger the **first deploy**. Fix build errors in the **Build logs** if any.
 8. Run the **smoke test** (§3 step **6** / §5.C table): `/login` → `/host` → `/host/control` → display URL.
 
+**Git deploy vs manual ZIP (why 503 can appear only after connecting Git)**  
+A ZIP upload is often a **pre-built** `.next` folder from your PC. A Git deploy runs **`npm install` / `npm ci` and `npm run build` on Hostinger’s servers** — a clean Linux environment with **no local `.env` file** (only the variables you set in the panel). That can surface issues that ZIP hid:
+
+- **Build fails or is skipped** → check **Build logs** (not only Runtime). Fix any red errors; a bad build can still leave the old site broken or return 503.
+- **Wrong branch** → confirm the connected branch is **`main`** and actually contains `package.json` / `package-lock.json`.
+- **Node version** → the runner must use **Node 20+** (this repo declares it in `package.json` → `engines`). Set Node 20 in the Hostinger app settings if there is a selector.
+- **Monorepo** → if the app isn’t at the repo root, set **Root directory** / **Base directory** to the folder that contains `package.json`.
+- **`npm ci` requires `package-lock.json`** in the repo; commit the lockfile or change install command to `npm install`.
+
 **If you only see “Manually uploaded” (no “Deploy from Git”)**
 
 Your screenshot matches a Node.js app that was created by **uploading a ZIP**. Git is not always shown on that summary screen; try in order:
@@ -199,6 +208,7 @@ If your domain’s email stays on Hostinger, that does not conflict with the app
 | Display 403 | Wrong `t` token or game id; use the exact link from `/host`. |
 | No sound on TV | Browsers require a user gesture — use **Tap to enable sound** on the display page. |
 | Relative display links on `/host` | Set `NEXT_PUBLIC_APP_URL` to your public `https://` origin. |
+| **503** on Hostinger / blank site | **(1)** In Supabase → **Project Settings → API**, confirm `NEXT_PUBLIC_SUPABASE_ANON_KEY` is the **`anon` `public`** key and `SUPABASE_SERVICE_ROLE_KEY` is the **`service_role` `secret`** key (they are never the same string). **(2)** **Start command** must be `npm run start` (or `npx next start …`), not a static file server. **(3)** If the panel has **Output directory** set to `.next`, try **clearing it** or using the default for **Node** apps (Hostinger expects `next start` to serve the built app; treating `.next` as static output is wrong). **(4)** Open **Runtime logs** for crash/OOM. **(5)** Set **Node 20+** if the panel asks. **(6)** If the platform assigns a port, set env **`PORT`** to that value or match it in reverse-proxy settings. **(7)** If this started **after connecting Git**: read **Build logs** (fresh CI build), confirm **branch** / **root directory** / committed **`package-lock.json`**, and see **Git deploy vs ZIP** in §5.E. |
 
 
 ## 8. Deployments
