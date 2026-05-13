@@ -42,7 +42,14 @@ function gridMask(
 
   switch (pattern) {
     case "straight_line":
+    case "straight_line_across":
       for (let c = 0; c < 5; c++) set(2, c);
+      break;
+    case "straight_line_down":
+      for (let r = 0; r < 5; r++) set(r, 2);
+      break;
+    case "diagonal_line":
+      for (let i = 0; i < 5; i++) set(i, i);
       break;
     case "x_pattern":
       for (let i = 0; i < 5; i++) {
@@ -59,6 +66,55 @@ function gridMask(
       set(0, 4);
       set(4, 0);
       set(4, 4);
+      break;
+    case "four_corners_stamp":
+      // Four single corners + a 2×2 stamp in the top-left
+      set(0, 0); set(0, 1);
+      set(1, 0); set(1, 1);
+      set(0, 4);
+      set(4, 0);
+      set(4, 4);
+      break;
+    case "four_stamps":
+      // 2×2 stamp in every corner
+      for (const [r0, c0] of [[0, 0], [0, 3], [3, 0], [3, 3]] as const) {
+        set(r0, c0); set(r0, c0 + 1);
+        set(r0 + 1, c0); set(r0 + 1, c0 + 1);
+      }
+      break;
+    case "plus_sign":
+      for (let i = 0; i < 5; i++) {
+        set(2, i);
+        set(i, 2);
+      }
+      break;
+    case "diamond":
+      set(0, 2);
+      set(1, 1); set(1, 3);
+      set(2, 0); set(2, 4);
+      set(3, 1); set(3, 3);
+      set(4, 2);
+      break;
+    case "heart":
+      set(0, 0); set(0, 1); set(0, 3); set(0, 4);
+      for (let c = 0; c < 5; c++) set(1, c);
+      for (let c = 0; c < 5; c++) set(2, c);
+      set(3, 1); set(3, 2); set(3, 3);
+      set(4, 2);
+      break;
+    case "tree":
+      set(0, 2);
+      set(1, 1); set(1, 2); set(1, 3);
+      for (let c = 0; c < 5; c++) set(2, c);
+      set(3, 2);
+      set(4, 2);
+      break;
+    case "dollar_sign":
+      set(0, 1); set(0, 2); set(0, 3);
+      set(1, 1); set(1, 2);
+      set(2, 1); set(2, 2); set(2, 3);
+      set(3, 2); set(3, 3);
+      set(4, 1); set(4, 2); set(4, 3);
       break;
     case "full_board":
       for (let r = 0; r < 5; r++)
@@ -83,7 +139,7 @@ export function WinPatternGlyph({
   title,
 }: {
   pattern: WinPattern;
-  size?: number;
+  size?: number | string;
   title?: string;
 }) {
   const g = gridMask(pattern);

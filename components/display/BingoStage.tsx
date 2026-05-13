@@ -73,20 +73,69 @@ export function BingoStage({
       }}
     >
 
-      {/* ── Top bar: BINGO wordmark + stats ─────────────────────────────── */}
+      {/* ── Top bar: stats (left) · BINGO wordmark (center) · win-pattern label (right) ── */}
       <header
         style={{
-          display: "flex",
+          display: "grid",
+          gridTemplateColumns: "1fr auto 1fr",
           alignItems: "center",
-          justifyContent: "space-between",
           padding: "clamp(6px,1.2vh,18px) clamp(10px,1.8vw,32px)",
           borderBottom: "1px solid rgba(255,255,255,0.07)",
           flexShrink: 0,
-          gap: "1vw",
+          gap: "clamp(8px, 1.5vw, 24px)",
         }}
       >
-        {/* BINGO wordmark */}
-        <div style={{ display: "flex", alignItems: "flex-end", gap: "clamp(2px,0.4vw,8px)", lineHeight: 1 }}>
+        {/* Stats strip — left column */}
+        <div
+          style={{
+            display: "flex",
+            gap: "clamp(12px,2.5vw,48px)",
+            alignItems: "center",
+            justifySelf: "start",
+          }}
+        >
+          {[
+            { label: "Called",    value: draws.length },
+            { label: "Remaining", value: remaining },
+            { label: "Complete",  value: `${Math.round((draws.length / totalBalls) * 100)}%` },
+          ].map(({ label, value }) => (
+            <div key={label} style={{ textAlign: "center" }}>
+              <div
+                style={{
+                  fontSize: "clamp(1.2rem, 2.8vw, 2.6rem)",
+                  fontWeight: 900,
+                  color: "#fff",
+                  lineHeight: 1,
+                }}
+              >
+                {value}
+              </div>
+              <div
+                style={{
+                  fontSize: "clamp(0.5rem, 0.9vw, 0.75rem)",
+                  fontWeight: 600,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.12em",
+                  color: "rgba(255,255,255,0.35)",
+                  marginTop: "2px",
+                }}
+              >
+                {label}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* BINGO wordmark — center column */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "flex-end",
+            gap: "clamp(2px,0.4vw,8px)",
+            lineHeight: 1,
+            justifySelf: "center",
+          }}
+        >
           {(["B","I","N","G","O"] as const).map((l) => (
             <span
               key={l}
@@ -103,82 +152,39 @@ export function BingoStage({
           ))}
         </div>
 
+        {/* Win-pattern label (text only — glyph lives above the called ball) — right column */}
         <div
           style={{
             display: "flex",
             alignItems: "center",
-            gap: "clamp(10px, 2vw, 28px)",
-            marginLeft: "auto",
+            justifySelf: "end",
+            textAlign: "right",
+            lineHeight: 1.2,
           }}
+          title={WIN_PATTERN_OPTIONS.find((o) => o.value === winPattern)?.description}
         >
-          {/* Stats strip */}
-          <div style={{ display: "flex", gap: "clamp(12px,2.5vw,48px)", alignItems: "center" }}>
-            {[
-              { label: "Called",    value: draws.length },
-              { label: "Remaining", value: remaining },
-              { label: "Complete",  value: `${Math.round((draws.length / totalBalls) * 100)}%` },
-            ].map(({ label, value }) => (
-              <div key={label} style={{ textAlign: "center" }}>
-                <div
-                  style={{
-                    fontSize: "clamp(1.2rem, 2.8vw, 2.6rem)",
-                    fontWeight: 900,
-                    color: "#fff",
-                    lineHeight: 1,
-                  }}
-                >
-                  {value}
-                </div>
-                <div
-                  style={{
-                    fontSize: "clamp(0.5rem, 0.9vw, 0.75rem)",
-                    fontWeight: 600,
-                    textTransform: "uppercase",
-                    letterSpacing: "0.12em",
-                    color: "rgba(255,255,255,0.35)",
-                    marginTop: "2px",
-                  }}
-                >
-                  {label}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Win pattern (5×5 glyph + label) */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "clamp(6px, 1vw, 12px)",
-              flexShrink: 0,
-            }}
-            title={WIN_PATTERN_OPTIONS.find((o) => o.value === winPattern)?.description}
-          >
-            <div style={{ textAlign: "right", lineHeight: 1.2 }}>
-              <div
-                style={{
-                  fontSize: "clamp(0.45rem, 0.65vw, 0.65rem)",
-                  fontWeight: 600,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.14em",
-                  color: "rgba(255,255,255,0.35)",
-                }}
-              >
-                Win pattern
-              </div>
-              <div
-                style={{
-                  fontSize: "clamp(0.55rem, 0.85vw, 0.8rem)",
-                  fontWeight: 700,
-                  color: "rgba(255,255,255,0.88)",
-                  maxWidth: "clamp(72px, 12vw, 140px)",
-                }}
-              >
-                {winPatternLabel}
-              </div>
+          <div>
+            <div
+              style={{
+                fontSize: "clamp(0.45rem, 0.65vw, 0.65rem)",
+                fontWeight: 600,
+                textTransform: "uppercase",
+                letterSpacing: "0.14em",
+                color: "rgba(255,255,255,0.35)",
+              }}
+            >
+              Win pattern
             </div>
-            <WinPatternGlyph pattern={winPattern} size={48} title={winPatternLabel} />
+            <div
+              style={{
+                fontSize: "clamp(0.7rem, 1.1vw, 1rem)",
+                fontWeight: 700,
+                color: "rgba(255,255,255,0.92)",
+                maxWidth: "clamp(120px, 18vw, 220px)",
+              }}
+            >
+              {winPatternLabel}
+            </div>
           </div>
         </div>
       </header>
@@ -206,6 +212,25 @@ export function BingoStage({
             overflow: "hidden",
           }}
         >
+          {/* Win-pattern glyph (above the called ball) */}
+          <div
+            style={{
+              width: "clamp(64px, 9vw, 120px)",
+              height: "clamp(64px, 9vw, 120px)",
+              flexShrink: 0,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+            title={WIN_PATTERN_OPTIONS.find((o) => o.value === winPattern)?.description}
+          >
+            <WinPatternGlyph
+              pattern={winPattern}
+              size="100%"
+              title={winPatternLabel}
+            />
+          </div>
+
           {/* Current ball bubble */}
           {latest ? (
             <div
