@@ -2,6 +2,11 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { isCurrentUserAdmin } from "@/lib/auth/admin";
 
+// Auth state depends on cookies; never statically cache or serve a stale
+// (logged-out) copy from Next.js or the Hostinger CDN.
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export default async function HomePage() {
   const supabase = await createClient();
   const {

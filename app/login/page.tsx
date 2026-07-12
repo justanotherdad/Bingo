@@ -3,6 +3,11 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { LoginForm } from "./LoginForm";
 
+// Auth state depends on cookies; never statically cache or serve a stale
+// (logged-out) copy from Next.js or the Hostinger CDN.
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export default async function LoginPage({
   searchParams,
 }: {
