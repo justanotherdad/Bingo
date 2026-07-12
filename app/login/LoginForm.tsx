@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
@@ -39,7 +38,6 @@ export function LoginForm({
   nextPath: string;
   initialMode?: Mode;
 }) {
-  const router = useRouter();
   const [mode, setMode] = useState<Mode>(initialMode);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -111,13 +109,15 @@ export function LoginForm({
         email,
         password,
       });
-      setPending(false);
       if (signError) {
+        setPending(false);
         setError(formatAuthError(signError.message));
         return;
       }
-      router.push(getSuccessPath());
-      router.refresh();
+      // Hard navigation so the browser resends the freshly-set auth cookie and
+      // the server renders the authenticated dashboard (avoids the stale
+      // router-cache render that leaves the user stuck on the login screen).
+      window.location.assign(getSuccessPath());
       return;
     }
 
@@ -133,19 +133,20 @@ export function LoginForm({
         },
       },
     });
-    setPending(false);
-
     if (signError) {
+      setPending(false);
       setError(formatAuthError(signError.message));
       return;
     }
 
     if (data.session) {
-      router.push(getSuccessPath());
-      router.refresh();
+      // Session created immediately (email confirmation disabled): hard-navigate
+      // so the new auth cookie is sent to the server on the next request.
+      window.location.assign(getSuccessPath());
       return;
     }
 
+    setPending(false);
     setInfo(
       "Account created. Check your email for a confirmation link if your project requires email verification. You can sign in here once that’s done."
     );

@@ -214,7 +214,7 @@ If your domain’s email stays on Hostinger, that does not conflict with the app
 ## 8. Deployments
 
 ```bash
-cd "/Users/davefletes/Library/Mobile Documents/com~apple~CloudDocs/Buisness/DJ2/Applications/Bingo"
+cd "/Users/davefletes/Library/Mobile Documents/com~apple~CloudDocs/Buisness/DJ2/Applications/Bingo/Website"
 git add .
 git commit -m "fixes"
 git push -u origin main
